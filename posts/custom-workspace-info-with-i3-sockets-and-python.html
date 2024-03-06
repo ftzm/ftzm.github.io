@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head profile="http://www.w3.org/2005/10/profile">
+      <meta charset="UTF-8">
+      <meta name="description" content="">
+      <meta name="author" content="">
+      <meta name=viewport content="width=device-width, initial-scale=1">
+        <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="Custom Workspace Info with i3, Sockets, and Python">
+      <meta name="twitter:description" content="">
+          <title>Custom Workspace Info with i3, Sockets, and Python</title>
+      <link rel="stylesheet" href="/css/tufte.css">
+      <link rel="stylesheet" href="/css/custom.css">
+      <link rel="stylesheet" href="/css/syntax-minimal.css">
+  </head>
+<body>
+    <!--<header>
+    <nav class="smallHide">
+        <a  href="/">
+            <div id="home-text"> Home </div>
+        </a>
+        <a  href="/">
+            <div id="home-text"> Blog </div>
+        </a>
+        <a  href="/about">
+            <div id="home-text"> About </div>
+        </a>
+    </nav>
+    <div id="menu" class="bigHide"><i class="fas fa-bars"></i></div>
+
+    <div class="right-sidebar">
+        <a class="ext-link smallHide" href="/atom.xml">
+	  <i class="fas fa-rss"></i>
+        </a>
+
+	<div id="theme-button" class="smallHide">
+	  <i class="fas fa-adjust"></i>
+	</div>
+    </div>
+</header>
+->
+
+<div id="page">
+    <div class="wrapper">
+        <div class="masthead">
+            <div class="tags">
+	      <span class="doctype">Article</span>
+              —
+              <a href="/tag/ricing" class="tag ricing">ricing</a>
+
+              <a href="/tag/i3" class="tag i3">i3</a>
+
+              <a href="/tag/linux" class="tag linux">linux</a>
+
+              <a href="/tag/python" class="tag python">python</a>
+            </div>
+            <br>
+
+            <br>
+            <div class="metadata">
+            <span class="author">Matthew Fitzsimmons</span>
+            <span class="published">29 Jan 2015 • 11 min read</span>
+            </div>
+	    <hr>
+        </div>
+    </div>-->
+
+  
+      <section class="masthead">
+        <span class="logo2"><a class="no-tufte-underline" href="/">ftzm</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">home</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">blog</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/about">about</a></span>
+      </section>
+    <section>
+    <h1> Custom Workspace Info with i3, Sockets, and Python </h1>
+    <p>I recently switched from <a
+href="https://github.com/baskerville/bspwm">BSPWM</a> to <a
+href="https://i3wm.org/">i3</a>, and I'm very impressed. It has nearly
+every feature I've wished for from the WMs I've used in the past. The
+only thing I missed was the <a
+href="https://github.com/LemonBoy/bar">Lemonbar</a> setup I perfected
+with BSPWM. i3 has its own sysinfo bar, and won't send info to another
+one by default.</p>
+<p>Thankfully, i3 provides an interprocess communication interface.
+External programs or scripts can connect to an i3 instance through a
+socket in order to send commands, make queries, or subscribe to various
+types of events. While there are a number of existing python libraries
+to facilitate communication with i3, I found none that were both
+maintained and bug-free. Given the simplicity of these libraries, I
+decided to write what I wanted from scratch rather than troubleshoot
+someone else's code.</p>
+<p>Having learned the rudiments of communicating with i3 using Python, I
+thought I'd explain the more technical points for others in a similar
+situation. I'll show how to connect to i3, subscribe to workspace
+events, and output a string based on the current workspace info. This
+was my use-case, but the same methods can be employed to a variety of
+other ends.</p>
+<h1 id="necessary-modules">Necessary Modules</h1>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> socket</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> struct</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> json</span></code></pre></div>
+<h1 id="initializing-a-socket">Initializing a Socket</h1>
+<p>Firstly, if you're going to be dealing with more than one socket (and
+if you want to subscribe to events, you will), you're going to want to
+create a Socket class. We'll initialize sockets in the init method of
+that class. The steps for initialization are straightforward: create a
+socket object with the socket module, set a timeout, and connect.</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Socket():</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>):</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>        <span class="co">#must define AF_UNIX or unsupported, SOCK_STREAM is socket type</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.sock <span class="op">=</span> socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.sock.settimeout(<span class="dv">20</span>)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.sock.<span class="ex">connect</span>(socket_path)</span></code></pre></div>
+<p>All the functions that follow will be methods of the above Socket
+class.</p>
+<h1 id="formatting-message">Formatting Message</h1>
+<p>All messages sent to i3 are composed of the following components: 1.
+The "magic string" of "i3-ipc", which lets i3 know when a message
+begins. 2. The length of the payload, as an unsigned integer. 3. The
+type of message being sent, as an unsigned integer. See the i3-ipc
+documentation for a full list of message types and their identifiers. 4.
+The payload, that is to say the message sent to i3, if any. The message
+itself is sent as an 8 bit string.</p>
+<p>The following method will assemble a message to the above
+specifications, given a message type and payload string.</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> format_msg(<span class="va">self</span>, msg_type, payload):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    payload_length <span class="op">=</span> <span class="bu">len</span>(payload.encode(<span class="st">&#39;utf-8&#39;</span>))</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    msg_length <span class="op">=</span> struct.pack(<span class="st">&#39;I&#39;</span>, msg_length).decode(<span class="st">&#39;utf-8&#39;</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    msg_type <span class="op">=</span> struct.pack(<span class="st">&#39;I&#39;</span>, msg_type).decode(<span class="st">&#39;utf-8&#39;</span>)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    msg <span class="op">=</span> <span class="st">&#39;</span><span class="sc">%s%s%s%s</span><span class="st">&#39;</span> <span class="op">%</span> (magic_string, payload_length, msg_type, payload)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    msg <span class="op">=</span> msg.encode(<span class="st">&#39;utf-8&#39;</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> msg</span></code></pre></div>
+<h1 id="send-and-receiving-messages">Send and Receiving Messages</h1>
+<p>Sending a message is quite trivial:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> send(<span class="va">self</span>, msg):</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.sock.sendall(msg)</span></code></pre></div>
+<p>However, receiving messages is a bit trickier. Information is
+transferred through a socket as a continuous stream, and while it may
+contain discrete messages, there is no in-built mechanism to segment
+them. For that reason, we receive messages in two stages. First, we
+download those three standard standard elements that begin a message,
+which I'll term the header. Because the header takes a standard form, we
+can know exactly how much to download by measuring how long one would
+be. The above lines should go somewhere near the top of your script:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>magic_string <span class="op">=</span> <span class="st">&#39;i3-ipc&#39;</span>j</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>struct_header <span class="op">=</span> <span class="st">&#39;&lt;</span><span class="sc">%d</span><span class="st">sII&#39;</span> <span class="op">%</span> <span class="bu">len</span>(magic_string.encode(<span class="st">&#39;utf-8&#39;</span>))</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>struct_header_size <span class="op">=</span> struct.calcsize(struct_header)</span></code></pre></div>
+<p>Now that we know how large a message header will be, we can plug that
+length into a call to receive data:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>header <span class="op">=</span> <span class="va">self</span>.sock.recv(struct_header_size)</span></code></pre></div>
+<p>We then make use of the struct module to unpack the header, using the
+blueprint we established above:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>header <span class="op">=</span> struct.unpack(struct_header, header)</span></code></pre></div>
+<p>The unpack method returns a triple tuple, which we then split into
+its constituent parts:</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>magic_string, msg_length, msg_type <span class="op">=</span> <span class="va">self</span>.process_header(header)</span></code></pre></div>
+<p>The reason that the payload length is included in the header is that
+it tells us exactly how much more we need to receive from the socket to
+complete the message. We can now use that measurement go about gathering
+the remaining data:</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>payload <span class="op">=</span> <span class="va">self</span>.sock.recv(msg_length)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>\\<span class="co"># if the above didn&#39;t work, keep receiving from socket until we get the rest</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="cf">while</span> <span class="bu">len</span>(payload) <span class="op">&lt;</span> msg_length:</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>	data <span class="op">+=</span> <span class="va">self</span>.sock.recv(msg_length<span class="op">-</span><span class="bu">len</span>(payload))</span></code></pre></div>
+<p>As i3 sends the payload in JSON format, all that's left to do is
+convert it into something python can work with:</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>payload <span class="op">=</span> data.decode(<span class="st">&#39;utf-8&#39;</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>payload <span class="op">=</span> json.loads(payload)</span></code></pre></div>
+<p>Altogether, we'll end up with methods looking something like
+this:</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> send(<span class="va">self</span>, msg_type, payload):</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    msg <span class="op">=</span> <span class="va">self</span>.format_msg(msg_type, payload)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.sock.sendall(msg)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> receive(<span class="va">self</span>):</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    header <span class="op">=</span> <span class="va">self</span>.sock.recv(struct_header_size)</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    header <span class="op">=</span> struct.unpack(struct_header, header)</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    magic_string, msg_length, msg_type <span class="op">=</span> header</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> <span class="va">self</span>.sock.recv(msg_length)</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> <span class="bu">len</span>(data) <span class="op">&lt;</span> msg_length:</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    data <span class="op">+=</span> <span class="va">self</span>.sock.recv(msg_length<span class="op">-</span><span class="bu">len</span>(data))</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> <span class="va">self</span>.deformat_msg(data)</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> data.decode(<span class="st">&#39;utf-8&#39;</span>)</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> json.loads(payload)</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> data</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get(<span class="va">self</span>, msg_type, payload):</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.send(msg_type, payload)</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> <span class="va">self</span>.receive()</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> data</span></code></pre></div>
+<p>You'll notice that I've added an extra "get" method, because you'll
+almost always want to send and receive in succession.</p>
+<h1 id="subscribing">Subscribing</h1>
+<p>This is where the multiple sockets comes in. If you use the same
+socket to receive event messages as you do to make queries, from time to
+time you will send a request for information, and get an event message
+before the response, which will confuse your script. Using one socket to
+receive event messages and another for queries is a lot easier than
+building in a mechanism to handle unexpected messages, and the former is
+indeed recommended by the i3 IPC docs.</p>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>sub_sock <span class="op">=</span> Socket()</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>data_sock <span class="op">=</span> Socket()</span></code></pre></div>
+<p>Subscribing is pretty simple. You send i3 a message with a message
+code of 2, where the payload is json-formatted list of event types. The
+most basic way to that with what we've covered so far is this:</p>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>payload <span class="op">=</span> json.dumps([<span class="st">&#39;workspace&#39;</span>])</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>subscription <span class="op">=</span> sub_sock.get(<span class="dv">2</span>, payload)</span></code></pre></div>
+<p>We use get and fill the "subscription" variable because a
+subscription attempt returns a message saying whether or not the
+subscription was successful or a parse error ocurred. You'll at least
+want to retreive to get it out of the way, if not to evaluate it in some
+way.</p>
+<h1 id="listen-for-events">Listen For Events</h1>
+<p>With a subscription secured, event messages will be incoming, and
+we'll need to be listening for them. A "listen" function like the
+following will have to be added to the Socket class. It loops forever
+trying to receive a message, and simply continues if a reception attempt
+times out (which it will if there's nothing to receive, and the majority
+of the time there won't be).</p>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> listen(<span class="va">self</span>, callback<span class="op">=</span><span class="va">False</span>):</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>	<span class="cf">while</span> <span class="va">True</span>:</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>		<span class="cf">try</span>:</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>			event <span class="op">=</span> <span class="va">self</span>.receive()</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>			<span class="cf">if</span> callback:</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>				callback(event)</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>			<span class="cf">else</span>:</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>				<span class="bu">print</span>(event)</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>	<span class="cf">except</span> socket.timeout:</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>		<span class="cf">continue</span></span></code></pre></div>
+<h1 id="get-and-print-workspace-info">Get and Print Workspace Info</h1>
+<p>The problem with workspace events is that they only report
+information relevent to the current workspace. To get an overview of all
+workspaces we need to make a separate query for workspace information.
+You'll notice that the listen method takes an optional callback
+function. It's this function that we'll use to query for workspace info,
+format it, and then print it for external use (in this case lemonbar).
+You'll notice it queries using the "data_sock" socket for reasons
+discussed above.</p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> print_workspaces(event):</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>	data <span class="op">=</span> data_sock.get(<span class="dv">1</span>, <span class="st">&#39;&#39;</span>)[<span class="dv">1</span>]</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>	<span class="co">#pprint.pprint(event)</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>	<span class="cf">if</span> event[<span class="dv">1</span>][<span class="st">&#39;change&#39;</span>] <span class="kw">not</span> <span class="kw">in</span>  [<span class="st">&#39;focus&#39;</span>, <span class="st">&#39;init&#39;</span>]:</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>		<span class="cf">return</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>	output <span class="op">=</span> <span class="st">&quot;3&quot;</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>	<span class="cf">for</span> workspace <span class="kw">in</span> data:</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>	<span class="cf">if</span> workspace[<span class="st">&quot;focused&quot;</span>]:</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>		w <span class="op">=</span> <span class="st">&quot;foc&quot;</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>	<span class="cf">elif</span> workspace[<span class="st">&quot;urgent&quot;</span>]:</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>		w <span class="op">=</span> <span class="st">&#39;urg&#39;</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>	<span class="cf">else</span>:</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>		w <span class="op">=</span> <span class="st">&#39;unf&#39;</span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>	w <span class="op">+=</span> workspace[<span class="st">&#39;name&#39;</span>]</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>	output <span class="op">+=</span> <span class="st">&#39; </span><span class="sc">%s</span><span class="st">&#39;</span> <span class="op">%</span> w</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>	<span class="bu">print</span>(output)</span></code></pre></div>
+<p>The above function gets a bit of information about the workspaces,
+labels them with strings I use for formatting in my lemonbar script, and
+prints everything in a single string. If we call the listen method with
+this function as an argument, it will conveniently print a new line
+every time something changes.</p>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>sub_sock.subscribe(<span class="st">&#39;workspace&#39;</span>, print_workspaces)</span></code></pre></div>
+<h1 id="in-sum">In Sum</h1>
+<p>With that we have working script that gets and receives messages from
+i3, subscribes to workspace events, listens for event messages, and then
+runs a callback function to get and print the workspace info we want.
+While specific to my use-case, this example covers all of the basics of
+communicating with i3 with Python. With a little research in the i3-IPC
+documentation it should be easy to adapt or expand it to other
+tasks.</p>
+<p>My own script is only slightly more complex than this, and as of yet
+does not have general-purpose functionality. I do, however, intend to
+incrementally expand it as my demands grow, and I may end up polishing
+it and offering it as a fully featured library.</p>
+    </section>
+
+    <!--<div class="adjacent">
+      <a href="/posts/getting-output-from-a-backgrounded-python-script.html" class="prev">
+	<div class="arrow">
+	  <i class="fas fa-chevron-left"></i>
+	</div>
+	<div class="sample">
+	  <h2>Getting Output from a Backgrounded Python Script</h2>
+	  <p>A quick note on getting python scripts to print while backgrounded.</p>
+	  <date>02 Jan 2015</date>
+	</div>
+      </a>
+      <a href="/posts/better-access-to-relationship-objects-in-sqlalchemy.html" class="next">
+	<div class="sample">
+	  <h2>Better Access to Relationship Objects in SQLAlchemy</h2>
+	  <p>Relationship objects make it easy to include additional information
+about the nature of the relationship between two entities. However, it
+can still be clumsy to work with them using the standard configuration.</p>
+	  <date>25 Jan 2015</date>
+	</div>
+	<div class="arrow">
+	  <i class="fas fa-chevron-right"></i>
+	</div>
+      </a>
+    </div>
+        <br>
+        <br>
+	-->
+
+</div>
+
+<footer>
+  <p>
+    Matthew Fitzsimmons © 2020<br>
+    Built with Haskell using&nbsp;<a href="https://github.com/ChrisPenner/slick">Slick</a>&nbsp;•&nbsp;Published with&nbsp;<a href="https://www.nixos.org">Nix</a>
+    <p>
+</footer>
+
+<script src="/js/main.js"></script>
+</body>
+</html>

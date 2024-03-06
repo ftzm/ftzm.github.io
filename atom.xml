@@ -1,0 +1,1427 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <title>ftzm.org</title>
+    <link href="https://ftzm.org/atom.xml" rel="self" type="application/rss+xml" />
+  <updated>2024-03-04T18:59:SZ</updated>
+  <author>
+      <name>Matthew Fitzsimmons</name>
+  </author>
+  <id>https://ftzm.org/</id>
+
+  <entry>
+      <title>New Year, New Blog</title>
+      <link href="https://ftzm.orgposts/this-blog.html"/>
+      <id>https://ftzm.orgposts/this-blog.html</id>
+      <updated>2021-01-04T00:02:SZ</updated>
+      <category term="slick"/>
+      <category term="haskell"/>
+      <category term="pandoc"/>
+      <category term="nix"/>
+      <summary>I&#39;ve overhauled my blog. It&#39;s still static, and I&#39;m still using Haskell and Nix, but nearly everything else has changed.</summary>
+      <content type="html"><![CDATA[<p>I've overhauled my
+blog<span><label for="sn-f4f61b01-0283-4c25-8c62-4d120ffb83ba" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-f4f61b01-0283-4c25-8c62-4d120ffb83ba" class="margin-toggle"/><span
+class="sidenote">Did this involve writing any substantive new content?
+Of course not! Fiddling with styling and deployment systems is the most
+import part of creating a blog.</span></span>. It's still static, and
+I'm still using Haskell and Nix, but nearly everything else has changed.
+I have:</p>
+<ul>
+<li>given it a new style with a dark mode</li>
+<li>switched the blog framework from Hakyll to Slick</li>
+<li>migrated the nix bootstrapping to flakes</li>
+<li>switched from a docker image to a NixOS server deployed via
+deploy-rs</li>
+</ul>
+<p>It was a
+totally<span><label for="sn-bce2f31e-4c09-45de-94ca-d04d626488c4" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-bce2f31e-4c09-45de-94ca-d04d626488c4" class="margin-toggle"/><span
+class="sidenote">Fun isn’t necessary, but that doesn’t mean it’s not
+worthwhile.</span></span> unnecessary project, but it gave me a welcome
+chance to play around with some new tools over the holidays, and I'm
+very happy with how it turned out. The following is a write-up of the
+major features of the new implementation.</p>
+<section id="written-in-org-mode" class="level2">
+<h2>Written in org mode</h2>
+<p>Markdown might be the more obvious choice as a markup language, but
+if you've already invested in becoming productive with org mode then the
+latter is easily the better option. It's also best to reduce friction to
+creating content, and org mode is what I naturally reach for when I want
+to capture and expand on an idea.</p>
+</section>
+<section id="generated-with-haskell-slick" class="level2">
+<h2>Generated with Haskell + Slick</h2>
+<p>Hakyll has served me well for years, but so far I'm happy with the
+switch to the simpler Slick. Hakyll's "DSL" makes it easy to get
+up-and-running if you follow established patterns, but it's implemented
+in a sufficiently mystical fashion to make changing or adding
+functionality a real headache. Slick, on the other hand, is much easier
+to grok; it essentially consists of some utilities to glue together
+well-established libraries and tools:</p>
+<ul>
+<li>Pandoc to convert between the markup language and HTML</li>
+<li>Mustache for templating</li>
+<li>Shake for building and caching the output files</li>
+<li>Aeson to manipulate JSON at various stages</li>
+</ul>
+<p>A slick blog requires a few more lines and bit more up-front
+understanding on the part of the author, but in my view it is easier and
+more transparent in the long run.</p>
+<section id="using-org-mode-with-slick" class="level3">
+<h3>Using Org-mode with Slick</h3>
+<p>As of now Slick only has built-in support for markdown. Thankfully
+it's trivial to switch out the default markdown parsing functions with
+custom code to handle org mode. The <code>orgToHTML</code> function
+below can be used in place of slick's <code>markdownToHTML</code>:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span>           <span class="dt">Data.Aeson</span> <span class="kw">as</span> <span class="dt">A</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span>           <span class="dt">Development.Shake</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span>           <span class="dt">Text.Pandoc</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span>           <span class="dt">Slick.Pandoc</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="ot">defaultOrgOptions ::</span> <span class="dt">ReaderOptions</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>defaultOrgOptions <span class="ot">=</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  def { readerExtensions <span class="ot">=</span> exts }</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  <span class="kw">where</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    exts <span class="ot">=</span> <span class="fu">mconcat</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>     [ extensionsFromList</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>       [ <span class="dt">Ext_fenced_code_attributes</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>       , <span class="dt">Ext_auto_identifiers</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>       ]</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>     ]</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="ot">orgToHTMLWithOpts ::</span> <span class="dt">ReaderOptions</span> <span class="ot">-&gt;</span> <span class="dt">WriterOptions</span> <span class="ot">-&gt;</span> <span class="dt">T.Text</span> <span class="ot">-&gt;</span> <span class="dt">Action</span> <span class="dt">Value</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>orgToHTMLWithOpts rops wops txt <span class="ot">=</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>  loadUsing (readOrg rops) (writeHtml5String wops) txt</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="ot">orgToHTML ::</span> <span class="dt">T.Text</span> <span class="ot">-&gt;</span> <span class="dt">Action</span> <span class="dt">Value</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>orgToHTML txt <span class="ot">=</span>  orgToHTMLWithOpts defaultOrgOptions defaultHtml5Options txt</span></code></pre></div>
+</section>
+<section id="handling-arbitrary-org-metadata-with-pandoc"
+class="level3">
+<h3>Handling arbitrary org metadata with Pandoc</h3>
+<p>The downside of using org mode is the limited support for metadata
+parsing. Unlike the markdown parser, the org mode parser doesn't support
+yaml style metadata like the following:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="pp">---</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">title</span><span class="kw">:</span><span class="at"> my article</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">tags</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">writing</span><span class="kw">,</span><span class="at"> blogging</span><span class="kw">]</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="pp">---</span></span></code></pre></div>
+<p>It does support the standard org mode metadata format, where lines of
+the format <code>#+key: value</code> are placed at the beginning of the
+file. However, only a few standard keys are recognized–the rest are
+ignored. Thankfully the <code>Pandoc</code> datatype can be easily be
+re-parsed to capture un-parsed metadata lines. See below:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ot">{-# LANGUAGE OverloadedStrings     #-}</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span>           <span class="dt">Data.Aeson</span> <span class="kw">as</span> <span class="dt">A</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span>           <span class="dt">Data.Char</span> (toLower)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span>           <span class="dt">Data.List</span> <span class="kw">as</span> <span class="dt">L</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span>           <span class="dt">Data.Map</span> <span class="kw">as</span> <span class="dt">M</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span>           <span class="dt">Development.Shake</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span>           <span class="dt">Slick.Pandoc</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span>           <span class="dt">Text.Pandoc</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span>           <span class="dt">Text.Pandoc.Builder</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span>           <span class="dt">Text.Pandoc.Parsing</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="co">-- | Parse a RawBlock as an org metadata key-value pair.</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="ot">orgMetaKV ::</span> <span class="dt">Block</span> <span class="ot">-&gt;</span> (<span class="dt">T.Text</span>, <span class="dt">MetaValue</span>)</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>orgMetaKV (<span class="dt">RawBlock</span> _ txt) <span class="ot">=</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>  <span class="kw">case</span> (parse parser <span class="st">&quot;&quot;</span> txt) <span class="kw">of</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    <span class="dt">Left</span> err  <span class="ot">-&gt;</span> <span class="fu">error</span> <span class="op">$</span> <span class="fu">show</span> err</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    <span class="dt">Right</span> xs  <span class="ot">-&gt;</span> xs</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>  <span class="kw">where</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    parser <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>      _ <span class="ot">&lt;-</span> string <span class="st">&quot;#+&quot;</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>      key <span class="ot">&lt;-</span> manyTill anyChar <span class="op">$</span> string <span class="st">&quot;: &quot;</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>      value <span class="ot">&lt;-</span> colonList <span class="op">&lt;|&gt;</span> remainder</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>      <span class="fu">return</span> (T.pack <span class="op">$</span> L.map <span class="fu">toLower</span> key, toMetaValue value)</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>    colonList <span class="ot">=</span> toMetaValue <span class="op">&lt;$&gt;</span> <span class="kw">do</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>      _ <span class="ot">&lt;-</span> char <span class="ch">&#39;:&#39;</span></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>      endBy (many alphaNum) (char <span class="ch">&#39;:&#39;</span>)</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>    remainder <span class="ot">=</span> toMetaValue <span class="op">&lt;$&gt;</span> many anyChar</span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>orgMetaKV _ <span class="ot">=</span> <span class="fu">error</span> <span class="st">&quot;Invalid block type for org metadata&quot;</span></span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a><span class="co">-- | Parse unparsed org metadata from pandoc blocks and move to Meta.</span></span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a><span class="co">-- This is useful because Pandoc&#39;s org parser ignores all but a few</span></span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a><span class="co">-- metadata keys by default.</span></span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a><span class="ot">orgAllMeta ::</span> <span class="dt">Pandoc</span> <span class="ot">-&gt;</span> <span class="dt">Pandoc</span></span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>orgAllMeta (<span class="dt">Pandoc</span> (<span class="dt">Meta</span> meta) blocks) <span class="ot">=</span> <span class="dt">Pandoc</span> expandedMeta remainderBlocks</span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>  <span class="kw">where</span></span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>    expandedMeta <span class="ot">=</span> <span class="dt">Meta</span> <span class="op">$</span> M.union meta newMeta</span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>    newMeta <span class="ot">=</span> M.fromList <span class="op">$</span> L.map orgMetaKV rawMeta</span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>    (rawMeta, remainderBlocks) <span class="ot">=</span> <span class="fu">span</span> rawOrgBlock blocks</span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>    rawOrgBlock b</span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>      <span class="op">|</span> <span class="dt">RawBlock</span> (<span class="dt">Format</span> <span class="st">&quot;org&quot;</span>) _ <span class="ot">&lt;-</span> b <span class="ot">=</span> <span class="dt">True</span></span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>      <span class="op">|</span> <span class="fu">otherwise</span> <span class="ot">=</span> <span class="dt">False</span></span></code></pre></div>
+<p>We can plug this into the previous code by making the following
+change:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ot">orgToHTMLWithOpts ::</span> <span class="dt">ReaderOptions</span> <span class="ot">-&gt;</span> <span class="dt">WriterOptions</span> <span class="ot">-&gt;</span> <span class="dt">T.Text</span> <span class="ot">-&gt;</span> <span class="dt">Action</span> <span class="dt">Value</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>orgToHTMLWithOpts rops wops txt <span class="ot">=</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  loadUsing</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    (<span class="fu">fmap</span> orgAllMeta <span class="op">&lt;$&gt;</span> readOrg rops) <span class="co">-- &lt;$&gt; is over partially applied func</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    (writeHtml5String wops)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    txt</span></code></pre></div>
+</section>
+</section>
+<section id="built-with-nix" class="level2">
+<h2>Built with Nix</h2>
+<p>The project derivations are defined in a
+<code>release.nix</code>:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode nix"><code class="sourceCode nix"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="op">{</span> <span class="va">pkgs</span> <span class="op">}</span>:</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="kw">rec</span> <span class="op">{</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="va">generator</span> <span class="op">=</span> pkgs.haskellPackages.developPackage <span class="op">{</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="va">root</span> <span class="op">=</span> <span class="ss">./.</span><span class="op">;</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    <span class="va">modifier</span> <span class="op">=</span> <span class="va">drv</span><span class="op">:</span> pkgs.haskell.lib.overrideCabal drv <span class="op">(</span><span class="va">attrs</span><span class="op">:</span> <span class="op">{</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>        <span class="va">buildTools</span> <span class="op">=</span> <span class="kw">with</span> pkgs<span class="op">;</span> <span class="op">(</span>attrs.buildTools <span class="kw">or</span> <span class="op">[])</span> <span class="op">++</span> <span class="op">[</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>          haskellPackages.cabal-install</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>          haskellPackages.hpack</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>          haskellPackages.ghcid</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>          zlib</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>        <span class="op">];</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>        <span class="va">configureFlags</span> <span class="op">=</span> <span class="op">[</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>          <span class="st">&quot;--extra-lib-dirs=</span><span class="sc">${</span>pkgs.zlib<span class="sc">}</span><span class="st">/lib&quot;</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>        <span class="op">];</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>      <span class="op">})</span> <span class="op">;</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>  <span class="op">};</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>  <span class="va">files</span> <span class="op">=</span> pkgs.stdenv.mkDerivation <span class="op">{</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    <span class="va">name</span> <span class="op">=</span> <span class="st">&quot;ftzm-blog&quot;</span><span class="op">;</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    <span class="va">src</span> <span class="op">=</span> <span class="ss">./.</span><span class="op">;</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>    <span class="va">phases</span> <span class="op">=</span> <span class="st">&quot;unpackPhase buildPhase&quot;</span><span class="op">;</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>    <span class="va">version</span> <span class="op">=</span> <span class="st">&quot;0.1&quot;</span><span class="op">;</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>    <span class="va">buildInputs</span> <span class="op">=</span> <span class="op">[</span> generator <span class="op">];</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>    <span class="va">buildPhase</span> <span class="op">=</span> <span class="st">&#39;&#39;</span></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a><span class="st">      mkdir $out</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a><span class="st">      export LOCALE_ARCHIVE=&quot;</span><span class="sc">${</span>pkgs.glibcLocales<span class="sc">}</span><span class="st">/lib/locale/locale-archive&quot;;</span></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a><span class="st">      export LANG=en_US.UTF-8</span></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a><span class="st">      build-site</span></span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a><span class="st">      cp -r docs/* $out</span></span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a><span class="st">    &#39;&#39;</span><span class="op">;</span></span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a> <span class="op">};</span></span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>The first derivation is a simple haskell build of the blog generator.
+It relies on a standard <code>project.yaml</code> in the root directory
+which defines the details of the haskell build. Defining the haskell
+build in a project.yaml rather than in nix itself allows us to use cabal
+in a nix shell for local development, which is considerably more
+convenient. The second derivation simply uses the binary from the first
+derivation to build the site's static assets.</p>
+<p>I don't build the derivation in this file directly; I call it from a
+<a href="https://nixos.wiki/wiki/Flakes">flake file</a> like the
+following:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode nix"><code class="sourceCode nix"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="op">{</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="va">description</span> <span class="op">=</span> <span class="st">&quot;blog&quot;</span><span class="op">;</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="va">inputs</span>.<span class="va">nixpkgs</span>.<span class="va">url</span> <span class="op">=</span> <span class="st">&quot;github:NixOS/nixpkgs/19b5ddfbb951013461d39352bf05e6248369d580&quot;</span><span class="op">;</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="va">outputs</span> <span class="op">=</span> <span class="op">{</span> <span class="va">self</span><span class="op">,</span> <span class="va">nixpkgs</span> <span class="op">}</span>:</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>      <span class="va">packages</span> <span class="op">=</span> <span class="kw">with</span> <span class="bu">import</span> nixpkgs <span class="op">{</span> <span class="va">system</span> <span class="op">=</span> <span class="st">&quot;x86_64-linux&quot;</span><span class="op">;</span> <span class="op">};</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>          callPackage <span class="ss">./release.nix</span> <span class="op">{};</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">in</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>      <span class="op">{</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>        <span class="va">packages</span>.<span class="va">x86_64-linux</span>.<span class="va">generator</span> <span class="op">=</span> packages.generator<span class="op">;</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>        <span class="va">packages</span>.<span class="va">x86_64-linux</span>.<span class="va">files</span> <span class="op">=</span> packages.files<span class="op">;</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>        <span class="va">defaultPackage</span>.<span class="va">x86_64-linux</span> <span class="op">=</span> packages.generator<span class="op">;</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>      <span class="op">};</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>While still experimental, I've found flakes to be very ergonomic, and
+I really appreciate the first-class support for dependency pinning.
+Using this flake, I can build the (default package) generator with
+<code>nix build</code> or target the files attribute with
+<code>nix build .#files</code>.</p>
+</section>
+<section id="local-development" class="level2">
+<h2>Local development</h2>
+<p>Using flakes, we can run <code>nix develop</code> to start a
+development shell for the default package of the flake (in this case the
+generator). This will make cabal available and other build tools
+available. We can serve up the statically generated files via <a
+href="https://www.npmjs.com/package/serve">serve</a>, and use <a
+href="https://eradman.com/entrproject/">entr</a> to ensure that the
+files are re-generated on changes to the generator. Here's the script
+I'm using for this site:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">#!/usr/bin/env bash</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Rebuild on template/content change</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="fu">find</span> site/ <span class="kw">|</span> <span class="ex">entr</span> <span class="at">-p</span> sh <span class="at">-c</span> <span class="st">&#39;cabal run&#39;</span> <span class="kw">&amp;</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Rebuild on generator change</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="fu">find</span> app/ <span class="kw">|</span> <span class="ex">entr</span> <span class="at">-p</span> sh <span class="at">-c</span> <span class="st">&#39;rm -r .shake; rm -r docs; cabal run&#39;</span> <span class="kw">&amp;</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Clean up the terminal on exit</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="bu">trap</span> <span class="st">&quot;reset&quot;</span> EXIT</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Serve static files</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="ex">serve</span> docs</span></code></pre></div>
+</section>
+<section id="deployed-with-deploy-rs" class="level2">
+<h2>Deployed with deploy-rs</h2>
+<p>The blog files are served by Nginx on a tiny server running NixOS. To
+deploy I'm using <a
+href="https://github.com/serokell/deploy-rs">deploy-rs</a>, a new nix
+deployment tool by the folks at <a
+href="https://www.serokell.io">Serokell</a>. So far I prefer it to other
+nix deployment tools I've used in the past, mainly because:</p>
+<ul>
+<li>It's stateless</li>
+<li>It's based on flakes, making version pinning first class.</li>
+<li>It's well-documented and easy to use (not a given for tools in this
+space)</li>
+</ul>
+<p>Like other tools of this nature, it relies on a NixOS configuration
+for the server and some extra configuration governing building and
+deployment details. The my full <code>server.nix</code> contains many
+incidental details beyond the scope of this article, but the key portion
+defining the nginx service serving the blog is as follows:</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode nix"><code class="sourceCode nix"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>services = <span class="op">{</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="va">nginx</span> <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    <span class="va">enable</span> <span class="op">=</span> <span class="cn">true</span><span class="op">;</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="va">virtualHosts</span>.<span class="st">&quot;ftzm.org&quot;</span> <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>      <span class="va">enableACME</span> <span class="op">=</span> <span class="cn">true</span><span class="op">;</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>      <span class="va">forceSSL</span> <span class="op">=</span> <span class="cn">true</span><span class="op">;</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>      <span class="va">root</span> <span class="op">=</span> <span class="st">&quot;</span><span class="sc">${</span>nginxWebRoot<span class="sc">}</span><span class="st">&quot;</span><span class="op">;</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>      <span class="va">locations</span> <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;</span>/<span class="st">&quot;</span> <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>          <span class="va">extraConfig</span> <span class="op">=</span> <span class="st">&#39;&#39;</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="st">             # hide .html ending</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="st">             if ($request_uri ~ ^/(.*)\.html$) {</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="st">               return 302 $scheme://$http_host/$1;</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="st">             }</span></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="st">             try_files $uri $uri.html $uri/ =404;</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a><span class="st">          &#39;&#39;</span><span class="op">;</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>        <span class="op">};</span></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>      <span class="op">};</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>      <span class="va">extraConfig</span> <span class="op">=</span> <span class="st">&#39;&#39;</span></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="st">       error_page 404 /404.html;</span></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a><span class="st">      &#39;&#39;</span><span class="op">;</span></span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>    <span class="op">};</span></span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>  <span class="op">};</span></span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
+<p>Nix makes it easy to get Nginx running in just a few lines. Really
+the only essential line in <code>virtualhosts."ftzm.org"</code> is
+setting <code>root = ${nginxWebRoot}</code> where nginxWebRoot points to
+the blog files package defined above. The NixOS configuration is in turn
+imported as <code>blog-system</code> in the top level flake:</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode nix"><code class="sourceCode nix"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>nixosConfigurations.blog<span class="op">-</span>system = nixpkgs.lib.nixosSystem <span class="op">{</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="va">system</span> <span class="op">=</span> <span class="st">&quot;x86_64-linux&quot;</span><span class="op">;</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="va">modules</span> <span class="op">=</span> <span class="op">[</span> <span class="op">(</span><span class="bu">import</span> <span class="ss">./server.nix</span> <span class="op">{</span> <span class="va">nginxWebRoot</span> <span class="op">=</span> packages.files<span class="op">;})];</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
+<p>Up until this point everything has been vanilla Nix. The final piece
+of the puzzle is to specify <code>deploy.nodes</code>, which will tell
+deploy-rs what to deploy. Each node represents a target server to deploy
+to. We define a node also named <code>blog-system</code>, within which
+we specify the server's hostname, the nix profile to deploy to, and
+within that the <code>path</code> of the deployment, which is
+essentially the deployment command. The deployment command in this case
+is to activate the blog-system nixos configuration.</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode nix"><code class="sourceCode nix"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>deploy.nodes.blog<span class="op">-</span>system = <span class="op">{</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="va">hostname</span> <span class="op">=</span> <span class="st">&quot;ftzm.org&quot;</span><span class="op">;</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="va">profiles</span>.<span class="va">system</span> <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    <span class="va">sshUser</span> <span class="op">=</span> <span class="st">&quot;root&quot;</span><span class="op">;</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    <span class="va">user</span> <span class="op">=</span> <span class="st">&quot;root&quot;</span><span class="op">;</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    <span class="va">path</span> <span class="op">=</span> deploy<span class="op">-</span>rs.lib.x86_64<span class="op">-</span>linux.activate.nixos self.nixosConfigurations.blog<span class="op">-</span>system<span class="op">;</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="op">};</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="co"># This is highly advised, and will prevent many possible mistakes</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="va">checks</span> <span class="op">=</span> <span class="bu">builtins</span>.mapAttrs <span class="op">(</span><span class="va">system</span><span class="op">:</span> <span class="va">deployLib</span><span class="op">:</span> deployLib.deployChecks self.deploy<span class="op">)</span> deploy<span class="op">-</span>rs.lib<span class="op">;</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
+<p>All that's necessary to deploy to the defined nodes is to run the
+following command:
+<code>nix run github:serokell/deploy-rs ./. -- -- --impure</code>.</p>
+</section>]]></content>
+  </entry>
+  <entry>
+      <title>Related Posts in Hakyll</title>
+      <link href="https://ftzm.orgposts/tricks-with-tags-in-hakyll.html"/>
+      <id>https://ftzm.orgposts/tricks-with-tags-in-hakyll.html</id>
+      <updated>2018-01-25T00:06:SZ</updated>
+      <category term="hakyll"/>
+      <category term="haskell"/>
+      <summary>The Hakyll framework provides tags out of the box, but no way to leverage them to automatically link to related posts. This post describes how to leverage the existing tags functionality to that end.</summary>
+      <content type="html"><![CDATA[<section id="the-trouble-of-referencing-posts-in-posts" class="level2">
+<h2>The trouble of referencing posts in posts</h2>
+<p>The first step in setting up related posts is getting access to other
+posts within the post compilation function. Take the hakyll-init sample
+website as an example. Say we're generating our posts with some code
+like the following:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>match <span class="st">&quot;posts/*&quot;</span> <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    route <span class="op">$</span> setExtension <span class="st">&quot;html&quot;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    compile <span class="op">$</span> pandocCompiler</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>        <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/post.html&quot;</span>    postCtx</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>        <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/default.html&quot;</span> postCtx</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>        <span class="op">&gt;&gt;=</span> relativizeUrls</span></code></pre></div>
+<p>If we look at the code to generate the archive page, which has a list
+of all posts, we'll see some lines like the following of loading the
+posts:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>compile <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    posts <span class="ot">&lt;-</span> recentFirst <span class="op">=&lt;&lt;</span> loadAll <span class="st">&quot;posts/*&quot;</span></span></code></pre></div>
+<p>we might naively try to implant this into our posts compiler like
+this:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>match <span class="st">&quot;posts/*&quot;</span> <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    route <span class="op">$</span> setExtension <span class="st">&quot;html&quot;</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    compile <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>        posts <span class="ot">&lt;-</span> recentFirst <span class="op">=&lt;&lt;</span> loadAll <span class="st">&quot;posts/*&quot;</span> <span class="co">-- posts to use later</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>        pandocCompiler</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>            <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/post.html&quot;</span>    postCtx</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>            <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/default.html&quot;</span> postCtx</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>            <span class="op">&gt;&gt;=</span> relativizeUrls</span></code></pre></div>
+<p>This, however, will produce the following error:
+<code>[ERROR] Hakyll.Core.Runtime.chase: Dependency cycle detected: some-post.md depends on some-post.md</code>.
+This is because we've asked the post compiling function to depend upon
+the list of all parsed posts, including itself, which fails for obvious
+reasons. How can we get around this limitation?</p>
+</section>
+<section id="doubling-up-with-versions" class="level2">
+<h2>Doubling up with versions</h2>
+<p>Since we can't reference the post list list as it's being generated,
+we'll have to find a way to compile a separate list. Thankfully hakyll
+provides us with the ability to do just that via <a
+href="https://jaspervdj.be/hakyll/tutorials/06-versions.html">versions</a>.
+Below we compile a separate list of posts, to which we attach the
+version name "meta":</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>match <span class="st">&quot;posts/*&quot;</span> <span class="op">$</span> version <span class="st">&quot;meta&quot;</span> <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    route   <span class="op">$</span> setExtension <span class="st">&quot;html&quot;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    compile getResourceBody</span></code></pre></div>
+<p>We can then change the post loading line above to use the "meta"
+version of posts.</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>posts <span class="ot">&lt;-</span> loadAll (<span class="st">&quot;posts/*&quot;</span> <span class="op">.&amp;&amp;.</span> hasVersion <span class="st">&quot;meta&quot;</span>)</span></code></pre></div>
+<p>This compiles, but introduces another issue that must be
+addressed.</p>
+</section>
+<section id="dealing-with-duplicate-posts" class="level2">
+<h2>Dealing with duplicate posts</h2>
+<p>Now that we're compiling two lists of posts using
+<code>match "posts/*"</code>, we'll run into an issue where we have
+duplicate posts anywhere we load posts without specifying a version.
+There are two ways of dealing with this: using <code>hasNoVersion</code>
+or applying a version to both sets of posts and addressing what might be
+considered a bug in <code>tagsRules</code></p>
+<section id="using-hasnoversion" class="level3">
+<h3>using hasNoVersion</h3>
+<p>The simpler option is to use <code>hasNoVersion</code> anywhere you
+aren't using the "meta" version. It will look like this:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>posts <span class="ot">&lt;-</span> (loadAll (<span class="st">&quot;posts/*&quot;</span> <span class="op">.&amp;&amp;.</span> hasNoVersion)</span></code></pre></div>
+<p>The only downside of this approach is that to me, at least, it feels
+hacky.</p>
+</section>
+<section id="using-two-versions-and-fixing-tagsrules" class="level3">
+<h3>using two versions and fixing TagsRules</h3>
+<p>If all of the lists of posts have versions, the
+<code>tagsRules</code> function, responsible for generating pages which
+list all posts possessing a given tag, will create empty pages. This is
+because <code>tagsRules</code>, makes use of the fromList function,
+which as per its <a
+href="https://jaspervdj.be/hakyll/reference/Hakyll-Core-Identifier-Pattern.html">documentation</a>
+requires special handling of versions. I have fixed this by following <a
+href="http://hakyll.narkive.com/RqvLp93d/setversion-and-a-pattern">this
+post</a> and rolling my own version of tagsRules.</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ot">tagsRulesVersioned ::</span> <span class="dt">Tags</span> <span class="ot">-&gt;</span> (<span class="dt">String</span> <span class="ot">-&gt;</span> [<span class="dt">Identifier</span>] <span class="ot">-&gt;</span> <span class="dt">Rules</span> ()) <span class="ot">-&gt;</span> <span class="dt">Rules</span> ()</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>tagsRulesVersioned tags rules <span class="ot">=</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    forM_ (tagsMap tags) <span class="op">$</span> \(tag, identifiers) <span class="ot">-&gt;</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>        rulesExtraDependencies [tagsDependency tags] <span class="op">$</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>            create [tagsMakeId tags tag] <span class="op">$</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>                rules tag identifiers</span></code></pre></div>
+<p>This function is treated slightly differently than plain
+<code>tagsRules</code>. This difference is shown inline in the
+below:</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>tagsRulesVersioned tags <span class="op">$</span> \tag <span class="kw">pattern</span> <span class="ot">-&gt;</span> <span class="kw">do</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> title <span class="ot">=</span> <span class="st">&quot;Posts tagged \&quot;&quot;</span> <span class="op">++</span> tag <span class="op">++</span> <span class="st">&quot;\&quot;&quot;</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    route idRoute</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    compile <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>        <span class="co">-- The old version with tagsRules:</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>        <span class="co">-- posts &lt;- recentFirst =&lt;&lt; loadAll pattern</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>        <span class="co">-- The new version with tagsRulesVersioned:</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>        posts <span class="ot">&lt;-</span> loadAll <span class="op">$</span> fromList <span class="op">$</span> <span class="fu">map</span> (setVersion <span class="op">$</span> <span class="dt">Just</span> <span class="st">&quot;meta&quot;</span>) identifiers</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> ctx <span class="ot">=</span> constField <span class="st">&quot;title&quot;</span> title</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>                  <span class="ot">`mappend`</span> listField <span class="st">&quot;posts&quot;</span> postCtx (<span class="fu">return</span> posts)</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>                  <span class="ot">`mappend`</span> defaultContext</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>        makeItem <span class="st">&quot;&quot;</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>            <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/tag.html&quot;</span> ctx</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>            <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/default.html&quot;</span> ctx</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>            <span class="op">&gt;&gt;=</span> relativizeUrls</span></code></pre></div>
+</section>
+</section>
+<section id="gathering-related-posts" class="level2">
+<h2>Gathering related posts</h2>
+<p>Now that we've compiled a separate list of posts, we need a way to
+get related ones into the context for our post template. For that we
+need to write a context function. Here's a bit of a code dump showing
+how I accomplished this.</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- |A context that adds related posts under &quot;related&quot;</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>relatedPostsCtx</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="ot">  ::</span> [<span class="dt">Item</span> <span class="dt">String</span>] <span class="co">-- ^ List of post items</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="ot">-&gt;</span> <span class="dt">Int</span>           <span class="co">-- ^ Number of related posts to collect</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="ot">-&gt;</span> <span class="dt">Context</span> <span class="dt">String</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>relatedPostsCtx posts n <span class="ot">=</span> listFieldWith <span class="st">&quot;related&quot;</span> postCtx selectPosts</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">where</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    rateItem ts i <span class="ot">=</span> <span class="fu">length</span> <span class="op">.</span> <span class="fu">filter</span> (<span class="ot">`elem`</span> ts) <span class="op">&lt;$&gt;</span> (getTags <span class="op">$</span> itemIdentifier i)</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    selectPosts s <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>      postTags <span class="ot">&lt;-</span> getTags <span class="op">$</span> itemIdentifier s</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>      <span class="kw">let</span> trimmedItems <span class="ot">=</span> <span class="fu">filter</span> (<span class="fu">not</span> <span class="op">.</span> matchPath s) posts <span class="co">--exclude current post</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>      <span class="fu">take</span> n <span class="op">.</span> <span class="fu">reverse</span> <span class="op">&lt;$&gt;</span> sortOnM (rateItem postTags) trimmedItems</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="co">-- |Compare two items for equality based on their filepaths</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="ot">matchPath ::</span> <span class="dt">Item</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">Item</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">Bool</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>matchPath x y <span class="ot">=</span> eqOn (toFilePath <span class="op">.</span> itemIdentifier) x y</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a><span class="ot">eqOn ::</span> <span class="dt">Eq</span> b <span class="ot">=&gt;</span> (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> <span class="dt">Bool</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>eqOn f x y <span class="ot">=</span> f x <span class="op">==</span> f y</span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a><span class="ot">sortOnM ::</span> (<span class="dt">Monad</span> m, <span class="dt">Ord</span> b) <span class="ot">=&gt;</span> (a <span class="ot">-&gt;</span> m b) <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> m [a]</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>sortOnM f xs <span class="ot">=</span> <span class="fu">map</span> <span class="fu">fst</span> <span class="op">.</span> sortBy (comparing <span class="fu">snd</span>) <span class="op">.</span> <span class="fu">zip</span> xs <span class="op">&lt;$&gt;</span> <span class="fu">mapM</span> f xs</span></code></pre></div>
+<p>The last step is to apply this context in your post compilation
+section. Here's what that looks like for me; adapting this should be
+quite straightforward.</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>match <span class="st">&quot;posts/*&quot;</span> <span class="op">$</span> version <span class="st">&quot;html&quot;</span> <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    route <span class="op">$</span> setExtension <span class="st">&quot;html&quot;</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    compile <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>      ps <span class="ot">&lt;-</span> loadAll (<span class="st">&quot;posts/*&quot;</span> <span class="op">.&amp;&amp;.</span> hasVersion <span class="st">&quot;meta&quot;</span>)<span class="ot"> ::</span> <span class="dt">Compiler</span> [<span class="dt">Item</span> <span class="dt">String</span>]</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>      <span class="kw">let</span> ctx <span class="ot">=</span> tagsCtx tags <span class="op">&lt;&gt;</span> postCtx <span class="op">&lt;&gt;</span> relatedPostsCtx ps <span class="dv">2</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>      compiler</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>        <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/post.html&quot;</span> ctx</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>        <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/default.html&quot;</span> ctx</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>        <span class="op">&gt;&gt;=</span> relativizeUrls</span></code></pre></div>
+</section>]]></content>
+  </entry>
+  <entry>
+      <title>Org mode and hakyll</title>
+      <link href="https://ftzm.orgposts/org-test.html"/>
+      <id>https://ftzm.orgposts/org-test.html</id>
+      <updated>2018-01-01T00:05:SZ</updated>
+      <category term="hakyll"/>
+      <category term="org"/>
+      <category term="emacs"/>
+      <summary>Writing hakyll posts with org mode works well and allows a great emacs-based workflow.</summary>
+      <content type="html"><![CDATA[<section id="introduction" class="level2">
+<h2>Introduction</h2>
+<p>Since adopting Emacs I've begun using <a
+href="https://orgmode.org/">org mode</a> extensively for note-taking and
+personal organization. It's a natural choice for outlining an article or
+blog post, and what's more, <a
+href="https://jaspervdj.be/hakyll/">Hakyll</a> (using <a
+href="https://jaspervdj.be/hakyll/">Pandoc</a>) will compile org files
+just as readily as it will markdown–no configuration required.</p>
+</section>
+<section id="features" class="level2">
+<h2>Features</h2>
+<p>Org markup is too rich to be completely converted to html, but a
+respectable subset is. Simple things like <strong>bold</strong>,
+<u>underline</u> and <em>italic</em> are of course supported. Here are
+some other examples:</p>
+<section id="subheadings" class="level3">
+<h3>Subheadings</h3>
+<p>Pandoc will support up to sub-sub-headings, but no more.</p>
+<section id="subsubheading-one" class="level4">
+<h4>Subsubheading one</h4>
+<p>He doesn't have much to say.</p>
+</section>
+<section id="subsubheading-two" class="level4">
+<h4>Subsubheading two</h4>
+</section>
+</section>
+<section id="lists" class="level3">
+<h3>Lists</h3>
+<p>This is an unordered list:</p>
+<ul>
+<li>this is a list</li>
+<li>another element</li>
+<li>another element</li>
+</ul>
+<p>Ordered lists are also handled properly:</p>
+<ol>
+<li>First</li>
+<li>Second</li>
+<li>Third</li>
+</ol>
+<p>It also supports this format with items and inset information
+underneath:</p>
+<dl>
+<dt>Some Item</dt>
+<dd>
+Information abouth this item is expanded upon.
+</dd>
+<dt>Other Item</dt>
+<dd>
+Here is some other information relating to the second item.
+</dd>
+</dl>
+</section>
+<section id="source" class="level3">
+<h3>Source</h3>
+<p>Wouldn't it be interesting to see some source? You can do inline code
+<code class="verbatim">echo "like this"</code>, and also separate code
+blocks:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ot">factorial ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>factorial <span class="dv">0</span> <span class="ot">=</span> <span class="dv">1</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>factorial n <span class="ot">=</span> n <span class="op">*</span> factorial (n <span class="op">-</span> <span class="dv">1</span>)</span></code></pre></div>
+<p>Org mode is smart enough to correctly highlight the code-block in
+org-mode itself, so you don't publish embarassing typos. Just one more
+thing to be impressed by.</p>
+</section>
+<section id="quote" class="level3">
+<h3>Quote</h3>
+<p>This is a quote:</p>
+<blockquote>
+<p>Everything should be made as simple as possible, but not any simpler
+—Albert Einstein</p>
+</blockquote>
+</section>
+<section id="table" class="level3">
+<h3>Table</h3>
+<p>My CSS may not do this justice, but this a proper table.</p>
+<table>
+<thead>
+<tr class="header">
+<th>A</th>
+<th>B</th>
+<th>Long C Column</th>
+<th>D</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>2</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td>20</td>
+<td>30</td>
+<td>40</td>
+</tr>
+</tbody>
+</table>
+<p>I remember back in the day when you would create your whole page
+layout with these bad boys. Then these upstarts named "divs" came
+along…</p>
+</section>
+</section>
+<section id="in-sum" class="level2">
+<h2>In sum</h2>
+<p>Org mode is no more convenient to write than markdown; it's edge is
+that it allows you to write a rough sketch and then slowly flesh it out
+into a finished article. Anything that lowers the barrier to producing
+finished articles is valueable in my estimation.</p>
+</section>]]></content>
+  </entry>
+  <entry>
+      <title>Build Your Own IDE with Vim, Tmux, and Vimux</title>
+      <link href="https://ftzm.orgposts/build-your-own-ide-with-vim-tmux-and-vimux.html"/>
+      <id>https://ftzm.orgposts/build-your-own-ide-with-vim-tmux-and-vimux.html</id>
+      <updated>2016-01-16T00:04:SZ</updated>
+      <category term="haskell"/>
+      <category term="tmux"/>
+      <category term="vim"/>
+      <summary>Ok, maybe not a fully fledged IDE, but running unit tests in an external
+terminal with a single vim shortcut is pretty slick.</summary>
+      <content type="html"><![CDATA[<p>I program in Vim, which means that everything I do when
+programming--making database migrations, using git, etc.-- happens in a
+terminal. I like to pack all of those terminals into a Tmux session to
+keep things organized.</p>
+<p>My main focus recently has been TDDD (Test Driven Django
+Development). I'm testing constantly--so much so that switching back and
+forth between vim and a dedicated testing terminal once or twice a
+minute has become a real drag on my workflow.</p>
+<p>Thankfully, vim being vim, someone has written a plugin that makes
+your vim-tmux workflow as seamless as possible. <a
+href="https://github.com/benmills/vimux">Vimux</a> is a vim plugin that
+facilitates communication with the tmux session vim is running in. Its
+core feature is to open a small tmux pane beneath vim and send commands
+in it. This is perfect for running tests.</p>
+<p>All you need to get unit testing bound to a vim shortcut is a script
+to find the appropriate tests and run them. I wrote a simple,
+Django-specific implementation in Haskell (I won't waste an opportunity
+to practice Haskell).</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">System.Directory</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">System.FilePath</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">System.Process</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">Control.Monad</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">Data.Maybe</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">Control.Exception</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="ot">dirParents ::</span> <span class="dt">FilePath</span> <span class="ot">-&gt;</span> [<span class="dt">FilePath</span>]</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>dirParents <span class="ot">=</span> <span class="fu">takeWhile</span> (<span class="op">/=</span><span class="st">&quot;/&quot;</span>) <span class="op">.</span> <span class="fu">iterate</span> takeDirectory</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="ot">inDirConts ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">FilePath</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> <span class="dt">Bool</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>inDirConts x y <span class="ot">=</span> <span class="fu">elem</span> x <span class="op">&lt;$&gt;</span> getDirectoryContents y</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="ot">lowMatch ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">FilePath</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> (<span class="dt">Maybe</span> <span class="dt">FilePath</span>)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>lowMatch x y <span class="ot">=</span> listToMaybe <span class="op">&lt;$&gt;</span> filterM (inDirConts x) (dirParents y)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="ot">cmdArgs ::</span> <span class="dt">IO</span> (<span class="dt">Maybe</span> [<span class="dt">FilePath</span>])</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>cmdArgs <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>  mod_dir <span class="ot">&lt;-</span> getCurrentDirectory <span class="op">&gt;&gt;=</span> lowMatch <span class="st">&quot;__init__.py&quot;</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>  base_dir <span class="ot">&lt;-</span> <span class="fu">maybe</span> (<span class="fu">return</span> <span class="dt">Nothing</span>) (lowMatch <span class="st">&quot;manage.py&quot;</span>) mod_dir</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span> <span class="op">$</span> <span class="fu">sequence</span> [base_dir, <span class="fu">fmap</span> takeBaseName mod_dir]</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="ot">runCmd ::</span> <span class="dt">Maybe</span> [<span class="dt">String</span>] <span class="ot">-&gt;</span> <span class="dt">IO</span> ()</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>runCmd (<span class="dt">Just</span> (x<span class="op">:</span>y<span class="op">:</span>[])) <span class="ot">=</span> callProcess <span class="st">&quot;python&quot;</span> [x <span class="op">++</span> <span class="st">&quot;/manage.py&quot;</span>, <span class="st">&quot;test&quot;</span>, y]</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>runCmd _ <span class="ot">=</span> <span class="fu">return</span> ()</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="ot">main ::</span> <span class="dt">IO</span> ()</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>main <span class="ot">=</span> <span class="fu">catch</span> runtest handler</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>  <span class="kw">where</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>    flags <span class="ot">=</span> readProcess <span class="st">&quot;tmux&quot;</span> [<span class="st">&quot;display-message&quot;</span>, <span class="st">&quot;-p&quot;</span>, <span class="st">&quot;&#39;#F&#39;&quot;</span>] []</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>    runtest <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>      cmdArgs <span class="op">&gt;&gt;=</span> runCmd</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>      (<span class="fu">notElem</span> <span class="ch">&#39;Z&#39;</span> <span class="op">&lt;$&gt;</span> flags) <span class="op">&gt;&gt;=</span> <span class="fu">flip</span> when (callCommand <span class="st">&quot;tmux resize-pane -Z -t {top}&quot;</span>)</span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>      callCommand <span class="st">&quot;tmux display &#39;Tests Succesful&#39;&quot;</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a><span class="ot">    handler ::</span> <span class="dt">SomeException</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> ()</span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>    handler _ <span class="ot">=</span> (<span class="fu">elem</span> <span class="ch">&#39;Z&#39;</span> <span class="op">&lt;$&gt;</span> flags) <span class="op">&gt;&gt;=</span> <span class="fu">flip</span> when (callCommand <span class="st">&quot;tmux resize-pane -Z&quot;</span>)</span></code></pre></div>
+<p>It searches up the directory hierarchy for the root of the python
+module, then for the directory holding manage.py, then runs unit testing
+for the module. If the tests fail it reveals the testing terminal so I
+can see what went wrong, and if the tests pass it hides the testing
+terminal and flashes a happy message.</p>
+<p>Here is more or less the same thing in Python:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> subprocess <span class="im">import</span> call, check_output</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> find_up(query_dir, string):</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> query_dir <span class="kw">is</span> <span class="kw">not</span> <span class="st">&quot;/&quot;</span>:</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> string <span class="kw">in</span> os.listdir(query_dir):</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> query_dir</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>            query_dir <span class="op">=</span> os.path.dirname(query_dir)</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> unzoom():</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    flags <span class="op">=</span> check_output(<span class="st">&quot;tmux display-message -p &#39;#F&#39;&quot;</span>.split(<span class="st">&#39; &#39;</span>))</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="st">&quot;Z&quot;</span> <span class="kw">in</span> <span class="bu">str</span>(flags):</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>        call(<span class="st">&quot;tmux resize-pane -Z&quot;</span>, shell<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> assemble_command():</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    module_dir <span class="op">=</span> find_up(os.getcwd(), <span class="st">&quot;__init__.py&quot;</span>)</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>        module_name <span class="op">=</span> os.path.basename(module_dir)</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>        base_dir <span class="op">=</span> find_up(module_dir, <span class="st">&quot;manage.py&quot;</span>)</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">&quot;python </span><span class="sc">{}</span><span class="st">/manage.py test </span><span class="sc">{}</span><span class="st">&quot;</span>.<span class="bu">format</span>(base_dir, module_name)</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">AttributeError</span>:</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">None</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> main():</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    command <span class="op">=</span> assemble_command()</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> command:</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        unzoom()</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>        call(command, shell<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="va">__name__</span> <span class="op">==</span> <span class="st">&quot;__main__&quot;</span>:</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    main()</span></code></pre></div>
+<p>For scripts like the above tot work they need to be run in the same
+directory, so you'll need to use it in conjunction with
+VimuxRunCommandInDir("/path/to/script", 0). the 0 indicates that the
+filename won't be given as an argument to the preceding command. Bind
+":call VimuxRunCommandInDir("/path/to/script", 0)" to, say, <leader>t in
+your vimrc and you're all set.</p>
+<p>There are many advantages to using Tmux: terminal multiplexing,
+detaching and attaching to session, and now with Vimux, integration with
+Vim to improve your efficiency. Happy testing!</p>]]></content>
+  </entry>
+  <entry>
+      <title>Flexible workspace names in i3</title>
+      <link href="https://ftzm.orgposts/workspaces-only-need-names-when-you-can-see-them.html"/>
+      <id>https://ftzm.orgposts/workspaces-only-need-names-when-you-can-see-them.html</id>
+      <updated>2015-01-05T00:12:SZ</updated>
+      <category term="bash"/>
+      <category term="linux"/>
+      <category term="ricing"/>
+      <category term="i3"/>
+      <summary>A little trick for more convenient workspace naming in i3 (and
+potentially other WMs).</summary>
+      <content type="html"><![CDATA[<h1 id="introduction">Introduction</h1>
+<p>In the process of configuring i3 with Lemonbar I came up with a trick
+to simplify naming workspaces in i3, and potentially other WMs with
+similar configuration patterns.</p>
+<h1 id="the-trick">The Trick</h1>
+<p>i3 natively provides the ability to name workspaces, but this is
+arguably more trouble than it's worth. All keybindings relating to
+workspaces need to reference them by the assigned name, and workspace
+names typically need to be prefixed with a number to ensure they're
+ordered properly anyways (should a strict order be desired).</p>
+<p>If, however, one is using a custom bar script, workspace names can be
+assigned there rather than by i3. You can simply use numbers within i3's
+configuration script, but later convert them to names using something
+like the following:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">names</span><span class="op">=</span><span class="va">(</span>main web dev term mus<span class="va">)</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">[</span> $<span class="pp">[</span><span class="ss">num</span><span class="pp">-</span><span class="ss">1</span><span class="pp">]</span> <span class="ot">-lt</span> <span class="va">${</span><span class="op">#</span><span class="va">names</span><span class="op">[@]</span><span class="va">}</span> <span class="bu">]</span> <span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="va">name</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${names</span><span class="op">[</span>num-1<span class="op">]</span><span class="va">}</span><span class="st">&quot;</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    <span class="va">name</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${num}</span><span class="st">&quot;</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span></code></pre></div>
+<p>This method allows workspaces to maintain a strict order without
+number prefixes, and keybindings and other configuration need only
+reference workspaces by number, keeping configs simple. Workspace names
+can then be changed on the fly without overhauling any configs, which
+will save a bit of time for chronic re-themers.</p>]]></content>
+  </entry>
+  <entry>
+      <title>Linux Top Processes Script</title>
+      <link href="https://ftzm.orgposts/linux-top-processes-script.html"/>
+      <id>https://ftzm.orgposts/linux-top-processes-script.html</id>
+      <updated>2015-01-04T00:12:SZ</updated>
+      <category term="bash"/>
+      <category term="linux"/>
+      <category term="ricing"/>
+      <summary>I wrote a script to print the processes using the most resources,
+because a statusbar showing total resource usage alone isn&#39;t actually
+very useful.</summary>
+      <content type="html"><![CDATA[<p>It's common to see measurements of total cpu and memory usage
+featuring somewhere on a Linux power user's desktop. At first blush it
+seems sensible, but I've come to question the usefulness of these
+numbers. I'll sooner notice high fan noise or poor performance than a
+percentage sitting at the edge of my screen. Further, I'm seldom
+concerned with resource usage unless it's excessively high, in which
+case I'm mostly interested in what's responsible.</p>
+<p>I decided to do something a little different in my latest statusbar
+setup: I put together a bash script to print the top resource-consuming
+processes. processes from 'ps aux' are reduced to the resource
+percentage and command, and the command itself is trimmed to show only
+the key elements. You can specify whether to measure by cpu or memory
+usage, and how many of the top processes to print. I also added the
+option to specify a usage threshold under which processes aren't
+reported, because there's little utility in knowing that X is using 0.5%
+cpu.</p>
+<p>The full script is provided below.</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">#!/bin/bash</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">#defaults</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="va">metric</span><span class="op">=</span><span class="st">&quot;3,3&quot;</span> <span class="co"># measure cpu</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="va">percent</span><span class="op">=</span><span class="st">&quot;3&quot;</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="va">number</span><span class="op">=</span><span class="st">&quot;3&quot;</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="va">cutoff</span><span class="op">=</span>0</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="cf">while</span> <span class="kw">[[</span> <span class="va">$#</span> <span class="ot">&gt;</span> 0 <span class="kw">]];</span> <span class="cf">do</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>	<span class="va">key</span><span class="op">=</span><span class="st">&quot;</span><span class="va">$1</span><span class="st">&quot;</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>	<span class="cf">case</span> <span class="va">$key</span> <span class="kw">in</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>		<span class="ss">-m</span><span class="kw">|</span><span class="ss">--memory</span><span class="kw">)</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>			<span class="va">metric</span><span class="op">=</span><span class="st">&quot;4,4&quot;</span> <span class="co"># measure memory</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>			<span class="va">percent</span><span class="op">=</span><span class="st">&quot;4&quot;</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>			<span class="bu">shift</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>			<span class="cf">;;</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>		<span class="ss">-n</span><span class="kw">|</span><span class="ss">--number</span><span class="kw">)</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>			<span class="va">number</span><span class="op">=</span><span class="va">$2</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>			<span class="bu">shift</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>			<span class="cf">;;</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>		<span class="ss">-c</span><span class="kw">|</span><span class="ss">--cutoff</span><span class="kw">)</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>			<span class="va">cutoff</span><span class="op">=</span><span class="va">$2</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>			<span class="bu">shift</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>			<span class="cf">;;</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>		<span class="pp">*</span><span class="kw">)</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>			<span class="bu">shift</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>			<span class="cf">;;</span></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>	<span class="cf">esac</span></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="cf">done</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="va">procs</span><span class="op">=</span><span class="kw">`</span><span class="fu">ps</span> aux <span class="kw">|</span> <span class="fu">tail</span> <span class="at">-n</span> +2 <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-n</span> <span class="at">-rk</span> <span class="va">$metric</span> <span class="kw">|</span> <span class="fu">head</span> <span class="at">-n</span> <span class="va">$number</span> <span class="kw">|</span> <span class="fu">awk</span> <span class="at">-v</span> <span class="dt">\\</span></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>	<span class="va">perccol</span><span class="op">=</span><span class="va">$percent</span> <span class="st">&#39;{print $perccol&quot; &quot;substr($0, index($0,$11))}&#39;</span><span class="kw">`</span></span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="va">IFS</span><span class="op">=</span><span class="st">$&#39;</span><span class="dt">\\</span><span class="st">n&#39;</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">[</span> <span class="va">$cutoff</span> <span class="ot">!=</span> 0 <span class="bu">]</span><span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>	<span class="va">remaining_procs</span><span class="op">=</span><span class="st">&#39;&#39;</span></span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a>	<span class="cf">for</span> p <span class="kw">in</span> <span class="va">$procs</span><span class="kw">;</span> <span class="cf">do</span></span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>	<span class="va">IFS</span><span class="op">=</span><span class="st">&quot; &quot;</span></span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>		<span class="bu">set</span> <span class="at">--</span> <span class="va">$p</span></span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a>		<span class="cf">if</span> <span class="kw">((</span> <span class="va">$(</span><span class="fu">bc</span> <span class="op">&lt;&lt;&lt;</span> <span class="st">&quot;</span><span class="va">$1</span><span class="st"> &gt; </span><span class="va">$cutoff</span><span class="st">&quot;</span><span class="va">)</span> <span class="kw">));</span> <span class="cf">then</span></span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a>			<span class="va">remaining_procs</span><span class="op">+=</span><span class="va">$(</span><span class="bu">printf</span> <span class="st">&quot;</span><span class="dt">\\</span><span class="st">n</span><span class="va">$p</span><span class="st">&quot;</span><span class="va">)</span></span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>		<span class="cf">fi</span></span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a>	<span class="va">IFS</span><span class="op">=</span><span class="st">$&#39;</span><span class="dt">\\</span><span class="st">n&#39;</span></span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a>	<span class="cf">done</span></span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a>	<span class="va">procs</span><span class="op">=</span><span class="va">$remaining_procs</span></span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a><span class="va">line</span><span class="op">=</span><span class="st">&quot;&quot;</span></span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> p <span class="kw">in</span> <span class="va">$procs</span><span class="kw">;</span> <span class="cf">do</span></span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>	<span class="va">IFS</span><span class="op">=</span><span class="st">&quot; &quot;</span></span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>	<span class="bu">set</span> <span class="at">--</span> <span class="va">$p</span></span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a>	<span class="va">name2</span><span class="op">=</span><span class="st">&quot;&quot;</span></span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a>	<span class="va">percent</span><span class="op">=</span><span class="va">$1</span></span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a>	<span class="bu">shift</span></span>
+<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>	<span class="cf">if</span> <span class="kw">[[</span> <span class="va">$1</span> <span class="ot">==</span> /<span class="pp">*</span> <span class="kw">]];</span>  <span class="cf">then</span></span>
+<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a>		<span class="cf">if</span> <span class="kw">[[</span> <span class="va">$1</span> <span class="ot">==</span> <span class="pp">*</span>bin <span class="kw">||</span> <span class="va">$1</span> <span class="ot">==</span> <span class="pp">*</span>python <span class="kw">]];</span> <span class="cf">then</span></span>
+<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a>			<span class="bu">shift</span></span>
+<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a>			<span class="cf">while</span> <span class="kw">[[</span> <span class="va">$#</span> <span class="ot">&gt;</span> 0 <span class="kw">]];</span> <span class="cf">do</span></span>
+<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a>				<span class="cf">if</span> <span class="kw">[[</span> <span class="va">$1</span> <span class="ot">!=</span> -<span class="pp">*</span> <span class="kw">]];</span> <span class="cf">then</span></span>
+<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a><span class="va">IFS</span><span class="op">=</span><span class="st">&quot;/&quot;</span></span>
+<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a>	<span class="va">dir</span><span class="op">=</span><span class="va">(</span> <span class="va">$1</span> <span class="va">)</span></span>
+<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a>		<span class="va">name1</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${dir</span><span class="op">[</span>-1<span class="op">]</span><span class="va">}</span><span class="st">&quot;</span></span>
+<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a>	<span class="va">IFS</span><span class="op">=</span><span class="st">&quot; &quot;</span></span>
+<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a>		<span class="cf">break</span></span>
+<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span>
+<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a><span class="bu">shift</span></span>
+<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a>	<span class="cf">done</span></span>
+<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a>		<span class="cf">elif</span> <span class="kw">[[</span> <span class="va">$2</span> <span class="ot">==</span> /<span class="pp">*</span> <span class="kw">]];</span> <span class="cf">then</span></span>
+<span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a>			<span class="va">IFS</span><span class="op">=</span><span class="st">&quot;/&quot;</span></span>
+<span id="cb1-74"><a href="#cb1-74" aria-hidden="true" tabindex="-1"></a>			<span class="va">dir</span><span class="op">=</span><span class="va">(</span> <span class="va">$2</span> <span class="va">)</span></span>
+<span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a>			<span class="va">name1</span><span class="op">=</span><span class="va">${dir</span><span class="op">[</span>-1<span class="op">]</span><span class="va">}</span></span>
+<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a>			<span class="va">IFS</span><span class="op">=</span><span class="st">&quot; &quot;</span></span>
+<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a>		<span class="cf">else</span></span>
+<span id="cb1-78"><a href="#cb1-78" aria-hidden="true" tabindex="-1"></a>			<span class="va">IFS</span><span class="op">=</span><span class="st">&quot;/&quot;</span></span>
+<span id="cb1-79"><a href="#cb1-79" aria-hidden="true" tabindex="-1"></a>			<span class="va">dir</span><span class="op">=</span><span class="va">(</span> <span class="va">$1</span> <span class="va">)</span></span>
+<span id="cb1-80"><a href="#cb1-80" aria-hidden="true" tabindex="-1"></a>			<span class="va">name1</span><span class="op">=</span><span class="va">${dir</span><span class="op">[</span>-1<span class="op">]</span><span class="va">}</span></span>
+<span id="cb1-81"><a href="#cb1-81" aria-hidden="true" tabindex="-1"></a>			<span class="va">IFS</span><span class="op">=</span><span class="st">&quot; &quot;</span></span>
+<span id="cb1-82"><a href="#cb1-82" aria-hidden="true" tabindex="-1"></a>		<span class="cf">fi</span></span>
+<span id="cb1-83"><a href="#cb1-83" aria-hidden="true" tabindex="-1"></a>	<span class="cf">else</span></span>
+<span id="cb1-84"><a href="#cb1-84" aria-hidden="true" tabindex="-1"></a>		<span class="va">name1</span><span class="op">=</span><span class="va">$1</span></span>
+<span id="cb1-85"><a href="#cb1-85" aria-hidden="true" tabindex="-1"></a>		<span class="bu">shift</span></span>
+<span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a>		<span class="cf">while</span> <span class="kw">[[</span> <span class="va">$#</span> <span class="ot">&gt;</span> 0 <span class="kw">]];</span> <span class="cf">do</span></span>
+<span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a>			<span class="cf">if</span> <span class="kw">[[</span> <span class="va">$1</span> <span class="ot">!=</span> -<span class="pp">*</span> <span class="kw">]];</span> <span class="cf">then</span></span>
+<span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a>				<span class="va">IFS</span><span class="op">=</span><span class="st">&quot;/&quot;</span></span>
+<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a>					<span class="va">dir</span><span class="op">=</span><span class="va">(</span> <span class="va">$1</span> <span class="va">)</span></span>
+<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a>						<span class="va">name2</span><span class="op">=</span><span class="st">&quot;-</span><span class="va">${dir</span><span class="op">[</span>-1<span class="op">]</span><span class="va">}</span><span class="st">&quot;</span></span>
+<span id="cb1-91"><a href="#cb1-91" aria-hidden="true" tabindex="-1"></a>							<span class="va">IFS</span><span class="op">=</span><span class="st">&quot; &quot;</span></span>
+<span id="cb1-92"><a href="#cb1-92" aria-hidden="true" tabindex="-1"></a>								<span class="cf">break</span></span>
+<span id="cb1-93"><a href="#cb1-93" aria-hidden="true" tabindex="-1"></a>								<span class="cf">fi</span></span>
+<span id="cb1-94"><a href="#cb1-94" aria-hidden="true" tabindex="-1"></a>								<span class="bu">shift</span></span>
+<span id="cb1-95"><a href="#cb1-95" aria-hidden="true" tabindex="-1"></a>							<span class="cf">done</span></span>
+<span id="cb1-96"><a href="#cb1-96" aria-hidden="true" tabindex="-1"></a>	<span class="cf">fi</span></span>
+<span id="cb1-97"><a href="#cb1-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-98"><a href="#cb1-98" aria-hidden="true" tabindex="-1"></a>	<span class="va">line</span><span class="op">=</span><span class="st">&quot;</span><span class="va">$line</span><span class="st"> </span><span class="va">$percent</span><span class="st"> </span><span class="va">$name1$name2</span><span class="st">&quot;</span></span>
+<span id="cb1-99"><a href="#cb1-99" aria-hidden="true" tabindex="-1"></a><span class="cf">done</span></span>
+<span id="cb1-100"><a href="#cb1-100" aria-hidden="true" tabindex="-1"></a><span class="bu">printf</span> <span class="st">&quot;%s</span><span class="dt">\\</span><span class="st">n&quot;</span> <span class="st">&quot;</span><span class="va">$line</span><span class="st">&quot;</span></span></code></pre></div>
+<p>Now I can easily keep an eye out for resource hogs without having to
+run htop all the time. It's a huge improvement over raw percentage
+totals.</p>
+<p>This script will likely see improvements over time, so to guarantee
+yourself the most up-to-date version head over to my <a
+href="https://github.com/ftzm/scripts">script repository</a>.</p>]]></content>
+  </entry>
+  <entry>
+      <title>Getting Output from a Backgrounded Python Script</title>
+      <link href="https://ftzm.orgposts/getting-output-from-a-backgrounded-python-script.html"/>
+      <id>https://ftzm.orgposts/getting-output-from-a-backgrounded-python-script.html</id>
+      <updated>2015-01-02T00:12:SZ</updated>
+      <category term="python"/>
+      <category term="bash"/>
+      <category term="linux"/>
+      <summary>A quick note on getting python scripts to print while backgrounded.</summary>
+      <content type="html"><![CDATA[<p>I've rarely had occasion to run a python script in the background. I
+tend to use them for one-off tasks, and if they print to stdout I want
+the output immediately. I was therefore baffled when <a
+href="custom-workspace-info-with-i3-sockets-and-python">my python script
+to receive workspace info from i3</a> refused to pipe to <a
+href="https://github.com/LemonBoy/bar">Lemonbar</a>. Shouldn't it be as
+straightforward as piping output from a bash script? After a little
+toubleshooting I discovered that it is--so long as the script isn't
+backgrounded. When backgrounded, however, the default behavior is not to
+print until the process finishes. This is due to Python's output
+buffering.</p>
+<p>Thankfully, the solution to this problem is simple. To enable
+unbuffered, realtime output, run python with the -u flag:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> python <span class="at">-u</span> myscript.py</span></code></pre></div>
+<p>With that, everything works as expected.</p>]]></content>
+  </entry>
+  <entry>
+      <title>Custom Workspace Info with i3, Sockets, and Python</title>
+      <link href="https://ftzm.orgposts/custom-workspace-info-with-i3-sockets-and-python.html"/>
+      <id>https://ftzm.orgposts/custom-workspace-info-with-i3-sockets-and-python.html</id>
+      <updated>2015-01-29T00:11:SZ</updated>
+      <category term="ricing"/>
+      <category term="i3"/>
+      <category term="linux"/>
+      <category term="python"/>
+      <summary>i3 is an extremely flexible window manager, and its Inter-Process
+Communication facility makes it extensible as well. Here I&#39;ll show how
+to harness that extensibility with Python.
+custom-workspace-info-with-i3-sockets-and-python.</summary>
+      <content type="html"><![CDATA[<p>I recently switched from <a
+href="https://github.com/baskerville/bspwm">BSPWM</a> to <a
+href="https://i3wm.org/">i3</a>, and I'm very impressed. It has nearly
+every feature I've wished for from the WMs I've used in the past. The
+only thing I missed was the <a
+href="https://github.com/LemonBoy/bar">Lemonbar</a> setup I perfected
+with BSPWM. i3 has its own sysinfo bar, and won't send info to another
+one by default.</p>
+<p>Thankfully, i3 provides an interprocess communication interface.
+External programs or scripts can connect to an i3 instance through a
+socket in order to send commands, make queries, or subscribe to various
+types of events. While there are a number of existing python libraries
+to facilitate communication with i3, I found none that were both
+maintained and bug-free. Given the simplicity of these libraries, I
+decided to write what I wanted from scratch rather than troubleshoot
+someone else's code.</p>
+<p>Having learned the rudiments of communicating with i3 using Python, I
+thought I'd explain the more technical points for others in a similar
+situation. I'll show how to connect to i3, subscribe to workspace
+events, and output a string based on the current workspace info. This
+was my use-case, but the same methods can be employed to a variety of
+other ends.</p>
+<h1 id="necessary-modules">Necessary Modules</h1>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> socket</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> struct</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> json</span></code></pre></div>
+<h1 id="initializing-a-socket">Initializing a Socket</h1>
+<p>Firstly, if you're going to be dealing with more than one socket (and
+if you want to subscribe to events, you will), you're going to want to
+create a Socket class. We'll initialize sockets in the init method of
+that class. The steps for initialization are straightforward: create a
+socket object with the socket module, set a timeout, and connect.</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Socket():</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>):</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>        <span class="co">#must define AF_UNIX or unsupported, SOCK_STREAM is socket type</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.sock <span class="op">=</span> socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.sock.settimeout(<span class="dv">20</span>)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.sock.<span class="ex">connect</span>(socket_path)</span></code></pre></div>
+<p>All the functions that follow will be methods of the above Socket
+class.</p>
+<h1 id="formatting-message">Formatting Message</h1>
+<p>All messages sent to i3 are composed of the following components: 1.
+The "magic string" of "i3-ipc", which lets i3 know when a message
+begins. 2. The length of the payload, as an unsigned integer. 3. The
+type of message being sent, as an unsigned integer. See the i3-ipc
+documentation for a full list of message types and their identifiers. 4.
+The payload, that is to say the message sent to i3, if any. The message
+itself is sent as an 8 bit string.</p>
+<p>The following method will assemble a message to the above
+specifications, given a message type and payload string.</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> format_msg(<span class="va">self</span>, msg_type, payload):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    payload_length <span class="op">=</span> <span class="bu">len</span>(payload.encode(<span class="st">&#39;utf-8&#39;</span>))</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    msg_length <span class="op">=</span> struct.pack(<span class="st">&#39;I&#39;</span>, msg_length).decode(<span class="st">&#39;utf-8&#39;</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    msg_type <span class="op">=</span> struct.pack(<span class="st">&#39;I&#39;</span>, msg_type).decode(<span class="st">&#39;utf-8&#39;</span>)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    msg <span class="op">=</span> <span class="st">&#39;</span><span class="sc">%s%s%s%s</span><span class="st">&#39;</span> <span class="op">%</span> (magic_string, payload_length, msg_type, payload)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    msg <span class="op">=</span> msg.encode(<span class="st">&#39;utf-8&#39;</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> msg</span></code></pre></div>
+<h1 id="send-and-receiving-messages">Send and Receiving Messages</h1>
+<p>Sending a message is quite trivial:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> send(<span class="va">self</span>, msg):</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.sock.sendall(msg)</span></code></pre></div>
+<p>However, receiving messages is a bit trickier. Information is
+transferred through a socket as a continuous stream, and while it may
+contain discrete messages, there is no in-built mechanism to segment
+them. For that reason, we receive messages in two stages. First, we
+download those three standard standard elements that begin a message,
+which I'll term the header. Because the header takes a standard form, we
+can know exactly how much to download by measuring how long one would
+be. The above lines should go somewhere near the top of your script:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>magic_string <span class="op">=</span> <span class="st">&#39;i3-ipc&#39;</span>j</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>struct_header <span class="op">=</span> <span class="st">&#39;&lt;</span><span class="sc">%d</span><span class="st">sII&#39;</span> <span class="op">%</span> <span class="bu">len</span>(magic_string.encode(<span class="st">&#39;utf-8&#39;</span>))</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>struct_header_size <span class="op">=</span> struct.calcsize(struct_header)</span></code></pre></div>
+<p>Now that we know how large a message header will be, we can plug that
+length into a call to receive data:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>header <span class="op">=</span> <span class="va">self</span>.sock.recv(struct_header_size)</span></code></pre></div>
+<p>We then make use of the struct module to unpack the header, using the
+blueprint we established above:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>header <span class="op">=</span> struct.unpack(struct_header, header)</span></code></pre></div>
+<p>The unpack method returns a triple tuple, which we then split into
+its constituent parts:</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>magic_string, msg_length, msg_type <span class="op">=</span> <span class="va">self</span>.process_header(header)</span></code></pre></div>
+<p>The reason that the payload length is included in the header is that
+it tells us exactly how much more we need to receive from the socket to
+complete the message. We can now use that measurement go about gathering
+the remaining data:</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>payload <span class="op">=</span> <span class="va">self</span>.sock.recv(msg_length)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>\\<span class="co"># if the above didn&#39;t work, keep receiving from socket until we get the rest</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="cf">while</span> <span class="bu">len</span>(payload) <span class="op">&lt;</span> msg_length:</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>	data <span class="op">+=</span> <span class="va">self</span>.sock.recv(msg_length<span class="op">-</span><span class="bu">len</span>(payload))</span></code></pre></div>
+<p>As i3 sends the payload in JSON format, all that's left to do is
+convert it into something python can work with:</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>payload <span class="op">=</span> data.decode(<span class="st">&#39;utf-8&#39;</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>payload <span class="op">=</span> json.loads(payload)</span></code></pre></div>
+<p>Altogether, we'll end up with methods looking something like
+this:</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> send(<span class="va">self</span>, msg_type, payload):</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    msg <span class="op">=</span> <span class="va">self</span>.format_msg(msg_type, payload)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.sock.sendall(msg)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> receive(<span class="va">self</span>):</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    header <span class="op">=</span> <span class="va">self</span>.sock.recv(struct_header_size)</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    header <span class="op">=</span> struct.unpack(struct_header, header)</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    magic_string, msg_length, msg_type <span class="op">=</span> header</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> <span class="va">self</span>.sock.recv(msg_length)</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> <span class="bu">len</span>(data) <span class="op">&lt;</span> msg_length:</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    data <span class="op">+=</span> <span class="va">self</span>.sock.recv(msg_length<span class="op">-</span><span class="bu">len</span>(data))</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> <span class="va">self</span>.deformat_msg(data)</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> data.decode(<span class="st">&#39;utf-8&#39;</span>)</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> json.loads(payload)</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> data</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get(<span class="va">self</span>, msg_type, payload):</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.send(msg_type, payload)</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> <span class="va">self</span>.receive()</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> data</span></code></pre></div>
+<p>You'll notice that I've added an extra "get" method, because you'll
+almost always want to send and receive in succession.</p>
+<h1 id="subscribing">Subscribing</h1>
+<p>This is where the multiple sockets comes in. If you use the same
+socket to receive event messages as you do to make queries, from time to
+time you will send a request for information, and get an event message
+before the response, which will confuse your script. Using one socket to
+receive event messages and another for queries is a lot easier than
+building in a mechanism to handle unexpected messages, and the former is
+indeed recommended by the i3 IPC docs.</p>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>sub_sock <span class="op">=</span> Socket()</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>data_sock <span class="op">=</span> Socket()</span></code></pre></div>
+<p>Subscribing is pretty simple. You send i3 a message with a message
+code of 2, where the payload is json-formatted list of event types. The
+most basic way to that with what we've covered so far is this:</p>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>payload <span class="op">=</span> json.dumps([<span class="st">&#39;workspace&#39;</span>])</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>subscription <span class="op">=</span> sub_sock.get(<span class="dv">2</span>, payload)</span></code></pre></div>
+<p>We use get and fill the "subscription" variable because a
+subscription attempt returns a message saying whether or not the
+subscription was successful or a parse error ocurred. You'll at least
+want to retreive to get it out of the way, if not to evaluate it in some
+way.</p>
+<h1 id="listen-for-events">Listen For Events</h1>
+<p>With a subscription secured, event messages will be incoming, and
+we'll need to be listening for them. A "listen" function like the
+following will have to be added to the Socket class. It loops forever
+trying to receive a message, and simply continues if a reception attempt
+times out (which it will if there's nothing to receive, and the majority
+of the time there won't be).</p>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> listen(<span class="va">self</span>, callback<span class="op">=</span><span class="va">False</span>):</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>	<span class="cf">while</span> <span class="va">True</span>:</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>		<span class="cf">try</span>:</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>			event <span class="op">=</span> <span class="va">self</span>.receive()</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>			<span class="cf">if</span> callback:</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>				callback(event)</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>			<span class="cf">else</span>:</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>				<span class="bu">print</span>(event)</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>	<span class="cf">except</span> socket.timeout:</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>		<span class="cf">continue</span></span></code></pre></div>
+<h1 id="get-and-print-workspace-info">Get and Print Workspace Info</h1>
+<p>The problem with workspace events is that they only report
+information relevent to the current workspace. To get an overview of all
+workspaces we need to make a separate query for workspace information.
+You'll notice that the listen method takes an optional callback
+function. It's this function that we'll use to query for workspace info,
+format it, and then print it for external use (in this case lemonbar).
+You'll notice it queries using the "data_sock" socket for reasons
+discussed above.</p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> print_workspaces(event):</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>	data <span class="op">=</span> data_sock.get(<span class="dv">1</span>, <span class="st">&#39;&#39;</span>)[<span class="dv">1</span>]</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>	<span class="co">#pprint.pprint(event)</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>	<span class="cf">if</span> event[<span class="dv">1</span>][<span class="st">&#39;change&#39;</span>] <span class="kw">not</span> <span class="kw">in</span>  [<span class="st">&#39;focus&#39;</span>, <span class="st">&#39;init&#39;</span>]:</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>		<span class="cf">return</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>	output <span class="op">=</span> <span class="st">&quot;3&quot;</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>	<span class="cf">for</span> workspace <span class="kw">in</span> data:</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>	<span class="cf">if</span> workspace[<span class="st">&quot;focused&quot;</span>]:</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>		w <span class="op">=</span> <span class="st">&quot;foc&quot;</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>	<span class="cf">elif</span> workspace[<span class="st">&quot;urgent&quot;</span>]:</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>		w <span class="op">=</span> <span class="st">&#39;urg&#39;</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>	<span class="cf">else</span>:</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>		w <span class="op">=</span> <span class="st">&#39;unf&#39;</span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>	w <span class="op">+=</span> workspace[<span class="st">&#39;name&#39;</span>]</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>	output <span class="op">+=</span> <span class="st">&#39; </span><span class="sc">%s</span><span class="st">&#39;</span> <span class="op">%</span> w</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>	<span class="bu">print</span>(output)</span></code></pre></div>
+<p>The above function gets a bit of information about the workspaces,
+labels them with strings I use for formatting in my lemonbar script, and
+prints everything in a single string. If we call the listen method with
+this function as an argument, it will conveniently print a new line
+every time something changes.</p>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>sub_sock.subscribe(<span class="st">&#39;workspace&#39;</span>, print_workspaces)</span></code></pre></div>
+<h1 id="in-sum">In Sum</h1>
+<p>With that we have working script that gets and receives messages from
+i3, subscribes to workspace events, listens for event messages, and then
+runs a callback function to get and print the workspace info we want.
+While specific to my use-case, this example covers all of the basics of
+communicating with i3 with Python. With a little research in the i3-IPC
+documentation it should be easy to adapt or expand it to other
+tasks.</p>
+<p>My own script is only slightly more complex than this, and as of yet
+does not have general-purpose functionality. I do, however, intend to
+incrementally expand it as my demands grow, and I may end up polishing
+it and offering it as a fully featured library.</p>]]></content>
+  </entry>
+  <entry>
+      <title>Better Access to Relationship Objects in SQLAlchemy</title>
+      <link href="https://ftzm.orgposts/better-access-to-relationship-objects-in-sqlalchemy.html"/>
+      <id>https://ftzm.orgposts/better-access-to-relationship-objects-in-sqlalchemy.html</id>
+      <updated>2015-01-25T00:10:SZ</updated>
+      <category term="flask"/>
+      <category term="sqlalchemy"/>
+      <category term="database"/>
+      <summary>Relationship objects make it easy to include additional information
+about the nature of the relationship between two entities. However, it
+can still be clumsy to work with them using the standard configuration.</summary>
+      <content type="html"><![CDATA[<p>I'm in the process of creating a Flask+SQLAlchemy based web app to
+schedule and record strength training workouts, further details of which
+I'll likely divulge in a later entry. In this entry I'll just talk about
+a small tweak I made to my database design to make dealing with
+association objects simpler.</p>
+<p>The design of my application is such that exercises can be associated
+with multiple workout routines, and can have varying orders within those
+routines. This requires that the relationships themselves specify the
+order of exercises. The standard way to deal with extra columns in
+relationship tables is to use relationship objects.</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> RoutineDayExercise(db.Model):</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    __tablename__ <span class="op">=</span> <span class="st">&#39;routineday_exercises&#39;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    routineday_id <span class="op">=</span> db.Column(db.Integer, db.ForeignKey(<span class="st">&#39;routinedays.id&#39;</span>), primary_key<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    exercise_id <span class="op">=</span> db.Column(db.Integer, db.ForeignKey(<span class="st">&#39;exercises.id&#39;</span>), primary_key<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    order <span class="op">=</span> db.Column(db.Integer)</span></code></pre></div>
+<p>However, the standard way to configure these objects, with the
+combined foreign keys of the related tables constituting the primary
+keys, was awkward for my setup. The order of an exercise can be manually
+set by the user at any time, and deleting or re-arranging exercises mean
+that the order of all exercises in a routine must be frequently
+adjusted. It's therefore more convenient to access the relationship
+object directly rather than by going through an Exercise or Routine
+every time. To this end I eschewed the standard setup and created a
+table of RoutineExercises wherein each row has its own id and primary
+key, and the relationship comprises a pair of simple foreign keys.</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> RoutineDayExercise(db.Model):</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    __tablename__ <span class="op">=</span> <span class="st">&#39;routineday_exercises&#39;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">id</span> <span class="op">=</span> db.Column(db.Integer, primary_key<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    routineday_id <span class="op">=</span> db.Column(db.Integer, db.ForeignKey(<span class="st">&#39;routinedays.id&#39;</span>))</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    exercise_id <span class="op">=</span> db.Column(db.Integer, db.ForeignKey(<span class="st">&#39;exercises.id&#39;</span>))</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    order <span class="op">=</span> db.Column(db.Integer)</span></code></pre></div>
+<p>This setup made the the kinds of operations I had to implement much
+simpler.The only downside of such a setup is that the database does not
+automatically protect against duplicate entries as it would with the
+foreign key - primary key pair. This, however, is easily remedied by
+manually preventing duplicates in the method for adding new
+relationships, and/or by simply not presenting users with the ability to
+create duplicate relationships in the first place. In my case, when
+users add new exercises to a routine they're only presented with
+exercises that have yet to be added, which itself prevents
+duplicates.</p>]]></content>
+  </entry>
+  <entry>
+      <title>Fixing a Botched System Update Without Chroot</title>
+      <link href="https://ftzm.orgposts/fixing-a-botched-system-update-with-chroot.html"/>
+      <id>https://ftzm.orgposts/fixing-a-botched-system-update-with-chroot.html</id>
+      <updated>2015-01-25T00:10:SZ</updated>
+      <category term="arch"/>
+      <category term="linux"/>
+      <summary>When you find yourself unable to login to a Linux installation to fix it
+from within, chroot is usually the answer—but not always. Here I show
+how to repair a broken Arch Linux system upgrade without chroot.</summary>
+      <content type="html"><![CDATA[<p>When you find yourself unable to login to a Linux installation to fix
+it from within, chroot is usually the answer—but not always. Here I show
+how to repair a broken Arch Linux system upgrade without chroot.</p>
+<p>The other day I erroneously ran an incomplete upgrade to the <a
+href="https://www.archlinux.org/">Arch Linux</a> installation on my
+laptop, which resulted in my system running an upgraded ncurses package
+with an outdated bash package. Bash is very much dependent on ncurses,
+so when I next tried to boot up I found myself unable to log in, instead
+being sent back to the username prompt at every attempt. My first
+reaction was that I would have to boot up with external media and <a
+href="https://wiki.archlinux.org/index.php/Change_root">chroot</a> into
+the system to complete the update. In some 8 years of using Arch I've
+managed to avoid such calamity, but from my reading on the forums the
+first chroot seems almost rite of passage. So I wrote the latest arch
+iso to a spare usb, booted up, mounted my filesystem...and hit a wall at
+the chroot. I found that I could no more chroot into my system than log
+in; bash was broken, so nothing worked. Which really should have been
+obvious from the start.</p>
+<p>But no matter. A quick bit of research revealed that the solution to
+my problem was <a
+href="https://wiki.archlinux.org/index.php/Pacman">Pacman's</a> "--root"
+option. Forget chrooting--just mount the on-disk filesystem and run
+pacman in the external media shell, specifying that the disk filesystem
+is to be used as the root filesystem. This is really as simple as the
+following two commands:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> mount /dev/sdxX /mnt/something</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> pacman <span class="at">--root</span> /dev/something <span class="at">--cachedir</span><span class="op">=</span>/mnt/something/var/cache/pacman/pkg <span class="at">-Syu</span></span></code></pre></div>
+<p>Here xX represents the specific disk and partition of your root
+filesystem. The --cachedir option tells pacman to save downloaded
+packages on-disk as well, which one will likely want to do either for
+the ability to downgrade packages later or simply because the external
+media lacks space.</p>
+<p>The above worked perfectly for me, and my system was up and running
+within minutes. At my current rate it'll be another 8 years before I'll
+need this information again, but hopefully this information will help
+someone else in the meantime.</p>]]></content>
+  </entry>
+  <entry>
+      <title>Syncing Dotfiles in Git</title>
+      <link href="https://ftzm.orgposts/syncing-dotfiles-with-git.html"/>
+      <id>https://ftzm.orgposts/syncing-dotfiles-with-git.html</id>
+      <updated>2015-01-23T00:09:SZ</updated>
+      <category term="ricing"/>
+      <category term="git"/>
+      <summary>Don&#39;t waste time fighting muscle memory. With a few easy git commands
+you can replicate your standard working environment wherever you go.</summary>
+      <content type="html"><![CDATA[<p>One of the greatest joys of working in a Unix environment is the
+ability to tailor application settings exactly to your liking. However,
+it can equally be a pain to work on a machine without any of the
+keybinds and plugins you've become so accustomed to. Syncing your
+dotfiles across machines using <a href="https://github.com/">git</a> is
+an easy way to ensure maximum productivity wherever you work.</p>
+<h2 id="setup">Setup</h2>
+<p>To create an online repository based on the setting of one machine,
+first set up a git repository in home directory of that machine:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> cd</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git init</span></code></pre></div>
+<p>In order to make git ignore everything that <em>isn't</em> a dotfile,
+we make use of the .gitignore file. By adding a single wildcard
+(asterisk) to that file, git will be default ignore all files:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> echo <span class="st">&quot;*&quot;</span> <span class="op">&gt;&gt;</span> ~/.gitignore</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git add .gitignore</span></code></pre></div>
+<p>then, we force add all of the files we want to sync:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git add <span class="at">-f</span> .vimrc</span></code></pre></div>
+<p>To add whole folders, I find it easiest to cd into them and run:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git add <span class="at">-f</span> .</span></code></pre></div>
+<p>When you've added all the files you wish, add the remote repo and
+push your files:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git remote add origin https://github.com/youruser/dotfiles.git</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git push origin master</span></code></pre></div>
+<h2 id="sync-a-system-with-git-for-the-first-time">Sync a System with
+Git for the First Time:</h2>
+<p>git clone won't work as git needs to clone into an empty directory,
+which the home directory will invariably not be.</p>
+<p>Instead, initialize a git repo in the home directory:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> cd</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git init</span></code></pre></div>
+<p>Then, remote add the origin repository (on github in this case)</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git remote add origin https://github.com/youruser/dotfiles.git</span></code></pre></div>
+<p>Fetch the files from the origin repository</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git fetch <span class="at">--all</span></span></code></pre></div>
+<p>Then, reset the current branch to what has just been fetched. 'Git
+reset' resets the master branch to what's been fetched. The --hard
+option changes all the files in the working tree to match the files in
+origin/master."</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git reset <span class="at">--hard</span> origin/master</span></code></pre></div>
+<p>This method is preferable to a git pull, as a pull will not overwrite
+untracked local files, in the event that any local dotfiles will be
+overwritten by syncing with git.</p>
+<h2 id="add-new-changes">Add New Changes</h2>
+<p>To add new changes you've made on any machine, the procedure is the
+same as with a normal git project, but with the -f flag as above:</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git add <span class="at">-f</span> .Xresources</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git commit <span class="at">-m</span> <span class="st">&#39;updated colorscheme&#39;</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="kw">(</span><span class="ex">first</span> time<span class="kw">)</span> <span class="ex">$</span> git push origin master</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="kw">(</span><span class="ex">thereafter</span><span class="kw">)</span> <span class="ex">$</span> git push</span></code></pre></div>
+<h2 id="keeping-up-to-date">Keeping up to Date</h2>
+<p>In order to keep up to date, a simple git pull will suffice. You may
+consider put this into a login script or cron job to keep things current
+automatically.</p>]]></content>
+  </entry>
+  <entry>
+      <title>Syntax Highlighting with Markdow in Python</title>
+      <link href="https://ftzm.orgposts/syntax-highlighting-with-markdown-in-python.html"/>
+      <id>https://ftzm.orgposts/syntax-highlighting-with-markdown-in-python.html</id>
+      <updated>2015-01-23T00:09:SZ</updated>
+      <category term="python"/>
+      <category term="flask"/>
+      <summary>Syntax highlighting is just as useful in a blog as in an IDE. Your code
+will be easier for readers to follow, and it will look more polished to
+boot. It&#39;s a simple feature, adding very little code.</summary>
+      <content type="html"><![CDATA[<p>It seems that most of today's coding blogs have some form of syntax
+highlighting built in. I wanted to join in on this trend while making
+this blog, but found surprisingly few explanations of how to implement
+it. It tuns out it's a simple feature, adding very little code. Below I
+will show how to implement it in a python application.</p>
+<h2 id="markdown">Markdown</h2>
+<p>Markdown is now a well established markup language that greatly
+simplifies the process of writing for the web. The minimalistic markdown
+syntax is converted to html that can be inserted into a web page.
+Additionally, some implementations of Markdown are extended to allow
+Syntax highlighting. All that is required is to designate lengths of
+code, and different terms will automatically be wrapped in html tags to
+which colorizing css is later applied.</p>
+<h2 id="necessary-packages">Necessary Packages</h2>
+<p>There are multiple python packages for Markdown, but I found <a
+href="https://github.com/trentm/python-markdown2">markdown2</a> to be
+the most straightforward when it came to implementing syntax
+highlighting. For syntax highlighting, you will also need pygments. You
+should be using pip to install packages.</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> pip install markdown2 pygments</span></code></pre></div>
+<h2 id="designating-code">Designating code</h2>
+<p>In markdown2, syntax highlighting is done via an 'extra' called
+'fenced-code-blocks'. With this, all this is required is to insert three
+backticks on the lines preceding and following a stretch of code. To
+ensure the right programming language is selected for highlighting,
+append its name to the first set of backticks.</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="in">    ``` python</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="in">    class SomeCode():</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="in">        pass</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="in">    ```</span></span></code></pre></div>
+<h2 id="converting-markdown">Converting Markdown</h2>
+<p>At some point, markdown formatted text will have to be converted into
+html. All that is required for this is the following code, where
+"markdown_version" refers to the string of markdown text you wish to
+convert.</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> markdown2</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>...</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>html_version <span class="op">=</span> markdown2.markdown(markdown_version, extras<span class="op">=</span>[<span class="st">&quot;fenced-code-blocks&quot;</span>])</span></code></pre></div>
+<p>It is necessary to specify "fenced-code-blocks" as an extra so that
+markdown2 uses it to apply syntax highlighting tags. Otherwise those
+backtick-fenced stretches of code will be ignored by markdown. If
+everything works as it should, html_version should contain a string like
+the following:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode html"><code class="sourceCode html"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&lt;div</span> <span class="er">class</span><span class="ot">=</span><span class="st">&quot;codehilite&quot;</span><span class="kw">&gt;&lt;pre&gt;&lt;code&gt;&lt;span</span> <span class="er">class</span><span class="ot">=</span><span class="st">&quot;k&quot;</span><span class="kw">&gt;</span>class<span class="kw">&lt;/span&gt;</span> <span class="kw">&lt;span</span> <span class="er">class</span><span class="ot">=</span><span class="st">&quot;nc&quot;</span><span class="kw">&gt;</span>SomeCode<span class="kw">&lt;/span&gt;&lt;span</span> <span class="er">class</span><span class="ot">=</span><span class="st">&quot;p&quot;</span><span class="kw">&gt;</span>():<span class="kw">&lt;/span&gt;</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">&lt;span</span> <span class="er">class</span><span class="ot">=</span><span class="st">&quot;k&quot;</span><span class="kw">&gt;</span>pass<span class="kw">&lt;/span&gt;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="kw">&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;</span></span></code></pre></div>
+<p>As you can see, different syntactic categories are tagged. However,
+accompanying css is necessary to apply color.</p>
+<h2 id="the-css">The CSS</h2>
+<p>Applying css is as simple as downloading a colorscheme and applying
+it as you would any other css stylesheet. Colorschemes for pygments can
+be downloaded <a
+href="https://github.com/richleland/pygments-css">here</a>. Pick one
+that suits your taste, and plug it into your base.html, or wherever your
+<head> lives:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode html"><code class="sourceCode html"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&lt;link</span> <span class="er">rel</span><span class="ot">=</span><span class="st">&quot;stylesheet&quot;</span> <span class="er">type</span><span class="ot">=</span><span class="st">&quot;text/css&quot;</span> <span class="er">href</span><span class="ot">=</span><span class="st">&quot;url/for/your/colorscheme.css&quot;</span> <span class="kw">/&gt;</span></span></code></pre></div>]]></content>
+  </entry>
+</feed>

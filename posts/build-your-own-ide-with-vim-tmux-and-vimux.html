@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head profile="http://www.w3.org/2005/10/profile">
+      <meta charset="UTF-8">
+      <meta name="description" content="">
+      <meta name="author" content="">
+      <meta name=viewport content="width=device-width, initial-scale=1">
+        <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="Build Your Own IDE with Vim, Tmux, and Vimux">
+      <meta name="twitter:description" content="">
+          <title>Build Your Own IDE with Vim, Tmux, and Vimux</title>
+      <link rel="stylesheet" href="/css/tufte.css">
+      <link rel="stylesheet" href="/css/custom.css">
+      <link rel="stylesheet" href="/css/syntax-minimal.css">
+  </head>
+<body>
+    <!--<header>
+    <nav class="smallHide">
+        <a  href="/">
+            <div id="home-text"> Home </div>
+        </a>
+        <a  href="/">
+            <div id="home-text"> Blog </div>
+        </a>
+        <a  href="/about">
+            <div id="home-text"> About </div>
+        </a>
+    </nav>
+    <div id="menu" class="bigHide"><i class="fas fa-bars"></i></div>
+
+    <div class="right-sidebar">
+        <a class="ext-link smallHide" href="/atom.xml">
+	  <i class="fas fa-rss"></i>
+        </a>
+
+	<div id="theme-button" class="smallHide">
+	  <i class="fas fa-adjust"></i>
+	</div>
+    </div>
+</header>
+->
+
+<div id="page">
+    <div class="wrapper">
+        <div class="masthead">
+            <div class="tags">
+	      <span class="doctype">Article</span>
+              —
+              <a href="/tag/haskell" class="tag haskell">haskell</a>
+
+              <a href="/tag/tmux" class="tag tmux">tmux</a>
+
+              <a href="/tag/vim" class="tag vim">vim</a>
+            </div>
+            <br>
+
+            <br>
+            <div class="metadata">
+            <span class="author">Matthew Fitzsimmons</span>
+            <span class="published">16 Jan 2016 • 6 min read</span>
+            </div>
+	    <hr>
+        </div>
+    </div>-->
+
+  
+      <section class="masthead">
+        <span class="logo2"><a class="no-tufte-underline" href="/">ftzm</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">home</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">blog</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/about">about</a></span>
+      </section>
+    <section>
+    <h1> Build Your Own IDE with Vim, Tmux, and Vimux </h1>
+    <p>I program in Vim, which means that everything I do when
+programming--making database migrations, using git, etc.-- happens in a
+terminal. I like to pack all of those terminals into a Tmux session to
+keep things organized.</p>
+<p>My main focus recently has been TDDD (Test Driven Django
+Development). I'm testing constantly--so much so that switching back and
+forth between vim and a dedicated testing terminal once or twice a
+minute has become a real drag on my workflow.</p>
+<p>Thankfully, vim being vim, someone has written a plugin that makes
+your vim-tmux workflow as seamless as possible. <a
+href="https://github.com/benmills/vimux">Vimux</a> is a vim plugin that
+facilitates communication with the tmux session vim is running in. Its
+core feature is to open a small tmux pane beneath vim and send commands
+in it. This is perfect for running tests.</p>
+<p>All you need to get unit testing bound to a vim shortcut is a script
+to find the appropriate tests and run them. I wrote a simple,
+Django-specific implementation in Haskell (I won't waste an opportunity
+to practice Haskell).</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">System.Directory</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">System.FilePath</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">System.Process</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">Control.Monad</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">Data.Maybe</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">Control.Exception</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="ot">dirParents ::</span> <span class="dt">FilePath</span> <span class="ot">-&gt;</span> [<span class="dt">FilePath</span>]</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>dirParents <span class="ot">=</span> <span class="fu">takeWhile</span> (<span class="op">/=</span><span class="st">&quot;/&quot;</span>) <span class="op">.</span> <span class="fu">iterate</span> takeDirectory</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="ot">inDirConts ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">FilePath</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> <span class="dt">Bool</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>inDirConts x y <span class="ot">=</span> <span class="fu">elem</span> x <span class="op">&lt;$&gt;</span> getDirectoryContents y</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="ot">lowMatch ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">FilePath</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> (<span class="dt">Maybe</span> <span class="dt">FilePath</span>)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>lowMatch x y <span class="ot">=</span> listToMaybe <span class="op">&lt;$&gt;</span> filterM (inDirConts x) (dirParents y)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="ot">cmdArgs ::</span> <span class="dt">IO</span> (<span class="dt">Maybe</span> [<span class="dt">FilePath</span>])</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>cmdArgs <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>  mod_dir <span class="ot">&lt;-</span> getCurrentDirectory <span class="op">&gt;&gt;=</span> lowMatch <span class="st">&quot;__init__.py&quot;</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>  base_dir <span class="ot">&lt;-</span> <span class="fu">maybe</span> (<span class="fu">return</span> <span class="dt">Nothing</span>) (lowMatch <span class="st">&quot;manage.py&quot;</span>) mod_dir</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span> <span class="op">$</span> <span class="fu">sequence</span> [base_dir, <span class="fu">fmap</span> takeBaseName mod_dir]</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="ot">runCmd ::</span> <span class="dt">Maybe</span> [<span class="dt">String</span>] <span class="ot">-&gt;</span> <span class="dt">IO</span> ()</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>runCmd (<span class="dt">Just</span> (x<span class="op">:</span>y<span class="op">:</span>[])) <span class="ot">=</span> callProcess <span class="st">&quot;python&quot;</span> [x <span class="op">++</span> <span class="st">&quot;/manage.py&quot;</span>, <span class="st">&quot;test&quot;</span>, y]</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>runCmd _ <span class="ot">=</span> <span class="fu">return</span> ()</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="ot">main ::</span> <span class="dt">IO</span> ()</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>main <span class="ot">=</span> <span class="fu">catch</span> runtest handler</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>  <span class="kw">where</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>    flags <span class="ot">=</span> readProcess <span class="st">&quot;tmux&quot;</span> [<span class="st">&quot;display-message&quot;</span>, <span class="st">&quot;-p&quot;</span>, <span class="st">&quot;&#39;#F&#39;&quot;</span>] []</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>    runtest <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>      cmdArgs <span class="op">&gt;&gt;=</span> runCmd</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>      (<span class="fu">notElem</span> <span class="ch">&#39;Z&#39;</span> <span class="op">&lt;$&gt;</span> flags) <span class="op">&gt;&gt;=</span> <span class="fu">flip</span> when (callCommand <span class="st">&quot;tmux resize-pane -Z -t {top}&quot;</span>)</span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>      callCommand <span class="st">&quot;tmux display &#39;Tests Succesful&#39;&quot;</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a><span class="ot">    handler ::</span> <span class="dt">SomeException</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> ()</span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>    handler _ <span class="ot">=</span> (<span class="fu">elem</span> <span class="ch">&#39;Z&#39;</span> <span class="op">&lt;$&gt;</span> flags) <span class="op">&gt;&gt;=</span> <span class="fu">flip</span> when (callCommand <span class="st">&quot;tmux resize-pane -Z&quot;</span>)</span></code></pre></div>
+<p>It searches up the directory hierarchy for the root of the python
+module, then for the directory holding manage.py, then runs unit testing
+for the module. If the tests fail it reveals the testing terminal so I
+can see what went wrong, and if the tests pass it hides the testing
+terminal and flashes a happy message.</p>
+<p>Here is more or less the same thing in Python:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> subprocess <span class="im">import</span> call, check_output</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> find_up(query_dir, string):</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> query_dir <span class="kw">is</span> <span class="kw">not</span> <span class="st">&quot;/&quot;</span>:</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> string <span class="kw">in</span> os.listdir(query_dir):</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> query_dir</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>            query_dir <span class="op">=</span> os.path.dirname(query_dir)</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> unzoom():</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    flags <span class="op">=</span> check_output(<span class="st">&quot;tmux display-message -p &#39;#F&#39;&quot;</span>.split(<span class="st">&#39; &#39;</span>))</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="st">&quot;Z&quot;</span> <span class="kw">in</span> <span class="bu">str</span>(flags):</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>        call(<span class="st">&quot;tmux resize-pane -Z&quot;</span>, shell<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> assemble_command():</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    module_dir <span class="op">=</span> find_up(os.getcwd(), <span class="st">&quot;__init__.py&quot;</span>)</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>        module_name <span class="op">=</span> os.path.basename(module_dir)</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>        base_dir <span class="op">=</span> find_up(module_dir, <span class="st">&quot;manage.py&quot;</span>)</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">&quot;python </span><span class="sc">{}</span><span class="st">/manage.py test </span><span class="sc">{}</span><span class="st">&quot;</span>.<span class="bu">format</span>(base_dir, module_name)</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">AttributeError</span>:</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">None</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> main():</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    command <span class="op">=</span> assemble_command()</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> command:</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        unzoom()</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>        call(command, shell<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="va">__name__</span> <span class="op">==</span> <span class="st">&quot;__main__&quot;</span>:</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    main()</span></code></pre></div>
+<p>For scripts like the above tot work they need to be run in the same
+directory, so you'll need to use it in conjunction with
+VimuxRunCommandInDir("/path/to/script", 0). the 0 indicates that the
+filename won't be given as an argument to the preceding command. Bind
+":call VimuxRunCommandInDir("/path/to/script", 0)" to, say, <leader>t in
+your vimrc and you're all set.</p>
+<p>There are many advantages to using Tmux: terminal multiplexing,
+detaching and attaching to session, and now with Vimux, integration with
+Vim to improve your efficiency. Happy testing!</p>
+    </section>
+
+    <!--<div class="adjacent">
+      <a href="/posts/org-test.html" class="prev">
+	<div class="arrow">
+	  <i class="fas fa-chevron-left"></i>
+	</div>
+	<div class="sample">
+	  <h2>Org mode and hakyll</h2>
+	  <p>Writing hakyll posts with org mode works well and allows a great emacs-based workflow.</p>
+	  <date>01 Jan 2018</date>
+	</div>
+      </a>
+      <a href="/posts/workspaces-only-need-names-when-you-can-see-them.html" class="next">
+	<div class="sample">
+	  <h2>Flexible workspace names in i3</h2>
+	  <p>A little trick for more convenient workspace naming in i3 (and
+potentially other WMs).</p>
+	  <date>05 Jan 2015</date>
+	</div>
+	<div class="arrow">
+	  <i class="fas fa-chevron-right"></i>
+	</div>
+      </a>
+    </div>
+        <br>
+        <br>
+	-->
+
+</div>
+
+<footer>
+  <p>
+    Matthew Fitzsimmons © 2020<br>
+    Built with Haskell using&nbsp;<a href="https://github.com/ChrisPenner/slick">Slick</a>&nbsp;•&nbsp;Published with&nbsp;<a href="https://www.nixos.org">Nix</a>
+    <p>
+</footer>
+
+<script src="/js/main.js"></script>
+</body>
+</html>

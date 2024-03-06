@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head profile="http://www.w3.org/2005/10/profile">
+      <meta charset="UTF-8">
+      <meta name="description" content="">
+      <meta name="author" content="">
+      <meta name=viewport content="width=device-width, initial-scale=1">
+        <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="Related Posts in Hakyll">
+      <meta name="twitter:description" content="">
+          <title>Related Posts in Hakyll</title>
+      <link rel="stylesheet" href="/css/tufte.css">
+      <link rel="stylesheet" href="/css/custom.css">
+      <link rel="stylesheet" href="/css/syntax-minimal.css">
+  </head>
+<body>
+    <!--<header>
+    <nav class="smallHide">
+        <a  href="/">
+            <div id="home-text"> Home </div>
+        </a>
+        <a  href="/">
+            <div id="home-text"> Blog </div>
+        </a>
+        <a  href="/about">
+            <div id="home-text"> About </div>
+        </a>
+    </nav>
+    <div id="menu" class="bigHide"><i class="fas fa-bars"></i></div>
+
+    <div class="right-sidebar">
+        <a class="ext-link smallHide" href="/atom.xml">
+	  <i class="fas fa-rss"></i>
+        </a>
+
+	<div id="theme-button" class="smallHide">
+	  <i class="fas fa-adjust"></i>
+	</div>
+    </div>
+</header>
+->
+
+<div id="page">
+    <div class="wrapper">
+        <div class="masthead">
+            <div class="tags">
+	      <span class="doctype">Article</span>
+              —
+              <a href="/tag/hakyll" class="tag hakyll">hakyll</a>
+
+              <a href="/tag/haskell" class="tag haskell">haskell</a>
+            </div>
+            <br>
+
+            <br>
+            <div class="metadata">
+            <span class="author">Matthew Fitzsimmons</span>
+            <span class="published">25 Jan 2018 • 8 min read</span>
+            </div>
+	    <hr>
+        </div>
+    </div>-->
+
+  
+      <section class="masthead">
+        <span class="logo2"><a class="no-tufte-underline" href="/">ftzm</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">home</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">blog</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/about">about</a></span>
+      </section>
+    <section>
+    <h1> Related Posts in Hakyll </h1>
+    <section id="the-trouble-of-referencing-posts-in-posts" class="level2">
+<h2>The trouble of referencing posts in posts</h2>
+<p>The first step in setting up related posts is getting access to other
+posts within the post compilation function. Take the hakyll-init sample
+website as an example. Say we're generating our posts with some code
+like the following:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>match <span class="st">&quot;posts/*&quot;</span> <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    route <span class="op">$</span> setExtension <span class="st">&quot;html&quot;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    compile <span class="op">$</span> pandocCompiler</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>        <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/post.html&quot;</span>    postCtx</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>        <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/default.html&quot;</span> postCtx</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>        <span class="op">&gt;&gt;=</span> relativizeUrls</span></code></pre></div>
+<p>If we look at the code to generate the archive page, which has a list
+of all posts, we'll see some lines like the following of loading the
+posts:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>compile <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    posts <span class="ot">&lt;-</span> recentFirst <span class="op">=&lt;&lt;</span> loadAll <span class="st">&quot;posts/*&quot;</span></span></code></pre></div>
+<p>we might naively try to implant this into our posts compiler like
+this:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>match <span class="st">&quot;posts/*&quot;</span> <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    route <span class="op">$</span> setExtension <span class="st">&quot;html&quot;</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    compile <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>        posts <span class="ot">&lt;-</span> recentFirst <span class="op">=&lt;&lt;</span> loadAll <span class="st">&quot;posts/*&quot;</span> <span class="co">-- posts to use later</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>        pandocCompiler</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>            <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/post.html&quot;</span>    postCtx</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>            <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/default.html&quot;</span> postCtx</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>            <span class="op">&gt;&gt;=</span> relativizeUrls</span></code></pre></div>
+<p>This, however, will produce the following error:
+<code>[ERROR] Hakyll.Core.Runtime.chase: Dependency cycle detected: some-post.md depends on some-post.md</code>.
+This is because we've asked the post compiling function to depend upon
+the list of all parsed posts, including itself, which fails for obvious
+reasons. How can we get around this limitation?</p>
+</section>
+<section id="doubling-up-with-versions" class="level2">
+<h2>Doubling up with versions</h2>
+<p>Since we can't reference the post list list as it's being generated,
+we'll have to find a way to compile a separate list. Thankfully hakyll
+provides us with the ability to do just that via <a
+href="https://jaspervdj.be/hakyll/tutorials/06-versions.html">versions</a>.
+Below we compile a separate list of posts, to which we attach the
+version name "meta":</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>match <span class="st">&quot;posts/*&quot;</span> <span class="op">$</span> version <span class="st">&quot;meta&quot;</span> <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    route   <span class="op">$</span> setExtension <span class="st">&quot;html&quot;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    compile getResourceBody</span></code></pre></div>
+<p>We can then change the post loading line above to use the "meta"
+version of posts.</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>posts <span class="ot">&lt;-</span> loadAll (<span class="st">&quot;posts/*&quot;</span> <span class="op">.&amp;&amp;.</span> hasVersion <span class="st">&quot;meta&quot;</span>)</span></code></pre></div>
+<p>This compiles, but introduces another issue that must be
+addressed.</p>
+</section>
+<section id="dealing-with-duplicate-posts" class="level2">
+<h2>Dealing with duplicate posts</h2>
+<p>Now that we're compiling two lists of posts using
+<code>match "posts/*"</code>, we'll run into an issue where we have
+duplicate posts anywhere we load posts without specifying a version.
+There are two ways of dealing with this: using <code>hasNoVersion</code>
+or applying a version to both sets of posts and addressing what might be
+considered a bug in <code>tagsRules</code></p>
+<section id="using-hasnoversion" class="level3">
+<h3>using hasNoVersion</h3>
+<p>The simpler option is to use <code>hasNoVersion</code> anywhere you
+aren't using the "meta" version. It will look like this:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>posts <span class="ot">&lt;-</span> (loadAll (<span class="st">&quot;posts/*&quot;</span> <span class="op">.&amp;&amp;.</span> hasNoVersion)</span></code></pre></div>
+<p>The only downside of this approach is that to me, at least, it feels
+hacky.</p>
+</section>
+<section id="using-two-versions-and-fixing-tagsrules" class="level3">
+<h3>using two versions and fixing TagsRules</h3>
+<p>If all of the lists of posts have versions, the
+<code>tagsRules</code> function, responsible for generating pages which
+list all posts possessing a given tag, will create empty pages. This is
+because <code>tagsRules</code>, makes use of the fromList function,
+which as per its <a
+href="https://jaspervdj.be/hakyll/reference/Hakyll-Core-Identifier-Pattern.html">documentation</a>
+requires special handling of versions. I have fixed this by following <a
+href="http://hakyll.narkive.com/RqvLp93d/setversion-and-a-pattern">this
+post</a> and rolling my own version of tagsRules.</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ot">tagsRulesVersioned ::</span> <span class="dt">Tags</span> <span class="ot">-&gt;</span> (<span class="dt">String</span> <span class="ot">-&gt;</span> [<span class="dt">Identifier</span>] <span class="ot">-&gt;</span> <span class="dt">Rules</span> ()) <span class="ot">-&gt;</span> <span class="dt">Rules</span> ()</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>tagsRulesVersioned tags rules <span class="ot">=</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    forM_ (tagsMap tags) <span class="op">$</span> \(tag, identifiers) <span class="ot">-&gt;</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>        rulesExtraDependencies [tagsDependency tags] <span class="op">$</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>            create [tagsMakeId tags tag] <span class="op">$</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>                rules tag identifiers</span></code></pre></div>
+<p>This function is treated slightly differently than plain
+<code>tagsRules</code>. This difference is shown inline in the
+below:</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>tagsRulesVersioned tags <span class="op">$</span> \tag <span class="kw">pattern</span> <span class="ot">-&gt;</span> <span class="kw">do</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> title <span class="ot">=</span> <span class="st">&quot;Posts tagged \&quot;&quot;</span> <span class="op">++</span> tag <span class="op">++</span> <span class="st">&quot;\&quot;&quot;</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    route idRoute</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    compile <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>        <span class="co">-- The old version with tagsRules:</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>        <span class="co">-- posts &lt;- recentFirst =&lt;&lt; loadAll pattern</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>        <span class="co">-- The new version with tagsRulesVersioned:</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>        posts <span class="ot">&lt;-</span> loadAll <span class="op">$</span> fromList <span class="op">$</span> <span class="fu">map</span> (setVersion <span class="op">$</span> <span class="dt">Just</span> <span class="st">&quot;meta&quot;</span>) identifiers</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> ctx <span class="ot">=</span> constField <span class="st">&quot;title&quot;</span> title</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>                  <span class="ot">`mappend`</span> listField <span class="st">&quot;posts&quot;</span> postCtx (<span class="fu">return</span> posts)</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>                  <span class="ot">`mappend`</span> defaultContext</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>        makeItem <span class="st">&quot;&quot;</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>            <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/tag.html&quot;</span> ctx</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>            <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/default.html&quot;</span> ctx</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>            <span class="op">&gt;&gt;=</span> relativizeUrls</span></code></pre></div>
+</section>
+</section>
+<section id="gathering-related-posts" class="level2">
+<h2>Gathering related posts</h2>
+<p>Now that we've compiled a separate list of posts, we need a way to
+get related ones into the context for our post template. For that we
+need to write a context function. Here's a bit of a code dump showing
+how I accomplished this.</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- |A context that adds related posts under &quot;related&quot;</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>relatedPostsCtx</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="ot">  ::</span> [<span class="dt">Item</span> <span class="dt">String</span>] <span class="co">-- ^ List of post items</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="ot">-&gt;</span> <span class="dt">Int</span>           <span class="co">-- ^ Number of related posts to collect</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="ot">-&gt;</span> <span class="dt">Context</span> <span class="dt">String</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>relatedPostsCtx posts n <span class="ot">=</span> listFieldWith <span class="st">&quot;related&quot;</span> postCtx selectPosts</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">where</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    rateItem ts i <span class="ot">=</span> <span class="fu">length</span> <span class="op">.</span> <span class="fu">filter</span> (<span class="ot">`elem`</span> ts) <span class="op">&lt;$&gt;</span> (getTags <span class="op">$</span> itemIdentifier i)</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    selectPosts s <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>      postTags <span class="ot">&lt;-</span> getTags <span class="op">$</span> itemIdentifier s</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>      <span class="kw">let</span> trimmedItems <span class="ot">=</span> <span class="fu">filter</span> (<span class="fu">not</span> <span class="op">.</span> matchPath s) posts <span class="co">--exclude current post</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>      <span class="fu">take</span> n <span class="op">.</span> <span class="fu">reverse</span> <span class="op">&lt;$&gt;</span> sortOnM (rateItem postTags) trimmedItems</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="co">-- |Compare two items for equality based on their filepaths</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="ot">matchPath ::</span> <span class="dt">Item</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">Item</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">Bool</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>matchPath x y <span class="ot">=</span> eqOn (toFilePath <span class="op">.</span> itemIdentifier) x y</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a><span class="ot">eqOn ::</span> <span class="dt">Eq</span> b <span class="ot">=&gt;</span> (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> <span class="dt">Bool</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>eqOn f x y <span class="ot">=</span> f x <span class="op">==</span> f y</span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a><span class="ot">sortOnM ::</span> (<span class="dt">Monad</span> m, <span class="dt">Ord</span> b) <span class="ot">=&gt;</span> (a <span class="ot">-&gt;</span> m b) <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> m [a]</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>sortOnM f xs <span class="ot">=</span> <span class="fu">map</span> <span class="fu">fst</span> <span class="op">.</span> sortBy (comparing <span class="fu">snd</span>) <span class="op">.</span> <span class="fu">zip</span> xs <span class="op">&lt;$&gt;</span> <span class="fu">mapM</span> f xs</span></code></pre></div>
+<p>The last step is to apply this context in your post compilation
+section. Here's what that looks like for me; adapting this should be
+quite straightforward.</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>match <span class="st">&quot;posts/*&quot;</span> <span class="op">$</span> version <span class="st">&quot;html&quot;</span> <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    route <span class="op">$</span> setExtension <span class="st">&quot;html&quot;</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    compile <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>      ps <span class="ot">&lt;-</span> loadAll (<span class="st">&quot;posts/*&quot;</span> <span class="op">.&amp;&amp;.</span> hasVersion <span class="st">&quot;meta&quot;</span>)<span class="ot"> ::</span> <span class="dt">Compiler</span> [<span class="dt">Item</span> <span class="dt">String</span>]</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>      <span class="kw">let</span> ctx <span class="ot">=</span> tagsCtx tags <span class="op">&lt;&gt;</span> postCtx <span class="op">&lt;&gt;</span> relatedPostsCtx ps <span class="dv">2</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>      compiler</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>        <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/post.html&quot;</span> ctx</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>        <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/default.html&quot;</span> ctx</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>        <span class="op">&gt;&gt;=</span> relativizeUrls</span></code></pre></div>
+</section>
+    </section>
+
+    <!--<div class="adjacent">
+      <a href="/posts/this-blog.html" class="prev">
+	<div class="arrow">
+	  <i class="fas fa-chevron-left"></i>
+	</div>
+	<div class="sample">
+	  <h2>New Year, New Blog</h2>
+	  <p>I&#39;ve overhauled my blog. It&#39;s still static, and I&#39;m still using Haskell and Nix, but nearly everything else has changed.</p>
+	  <date>04 Jan 2021</date>
+	</div>
+      </a>
+      <a href="/posts/org-test.html" class="next">
+	<div class="sample">
+	  <h2>Org mode and hakyll</h2>
+	  <p>Writing hakyll posts with org mode works well and allows a great emacs-based workflow.</p>
+	  <date>01 Jan 2018</date>
+	</div>
+	<div class="arrow">
+	  <i class="fas fa-chevron-right"></i>
+	</div>
+      </a>
+    </div>
+        <br>
+        <br>
+	-->
+
+</div>
+
+<footer>
+  <p>
+    Matthew Fitzsimmons © 2020<br>
+    Built with Haskell using&nbsp;<a href="https://github.com/ChrisPenner/slick">Slick</a>&nbsp;•&nbsp;Published with&nbsp;<a href="https://www.nixos.org">Nix</a>
+    <p>
+</footer>
+
+<script src="/js/main.js"></script>
+</body>
+</html>

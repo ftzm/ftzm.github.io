@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head profile="http://www.w3.org/2005/10/profile">
+      <meta charset="UTF-8">
+      <meta name="description" content="">
+      <meta name="author" content="">
+      <meta name=viewport content="width=device-width, initial-scale=1">
+        <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="Getting Output from a Backgrounded Python Script">
+      <meta name="twitter:description" content="">
+          <title>Getting Output from a Backgrounded Python Script</title>
+      <link rel="stylesheet" href="/css/tufte.css">
+      <link rel="stylesheet" href="/css/custom.css">
+      <link rel="stylesheet" href="/css/syntax-minimal.css">
+  </head>
+<body>
+    <!--<header>
+    <nav class="smallHide">
+        <a  href="/">
+            <div id="home-text"> Home </div>
+        </a>
+        <a  href="/">
+            <div id="home-text"> Blog </div>
+        </a>
+        <a  href="/about">
+            <div id="home-text"> About </div>
+        </a>
+    </nav>
+    <div id="menu" class="bigHide"><i class="fas fa-bars"></i></div>
+
+    <div class="right-sidebar">
+        <a class="ext-link smallHide" href="/atom.xml">
+	  <i class="fas fa-rss"></i>
+        </a>
+
+	<div id="theme-button" class="smallHide">
+	  <i class="fas fa-adjust"></i>
+	</div>
+    </div>
+</header>
+->
+
+<div id="page">
+    <div class="wrapper">
+        <div class="masthead">
+            <div class="tags">
+	      <span class="doctype">Article</span>
+              —
+              <a href="/tag/python" class="tag python">python</a>
+
+              <a href="/tag/bash" class="tag bash">bash</a>
+
+              <a href="/tag/linux" class="tag linux">linux</a>
+            </div>
+            <br>
+
+            <br>
+            <div class="metadata">
+            <span class="author">Matthew Fitzsimmons</span>
+            <span class="published">02 Jan 2015 • 1 min read</span>
+            </div>
+	    <hr>
+        </div>
+    </div>-->
+
+  
+      <section class="masthead">
+        <span class="logo2"><a class="no-tufte-underline" href="/">ftzm</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">home</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">blog</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/about">about</a></span>
+      </section>
+    <section>
+    <h1> Getting Output from a Backgrounded Python Script </h1>
+    <p>I've rarely had occasion to run a python script in the background. I
+tend to use them for one-off tasks, and if they print to stdout I want
+the output immediately. I was therefore baffled when <a
+href="custom-workspace-info-with-i3-sockets-and-python">my python script
+to receive workspace info from i3</a> refused to pipe to <a
+href="https://github.com/LemonBoy/bar">Lemonbar</a>. Shouldn't it be as
+straightforward as piping output from a bash script? After a little
+toubleshooting I discovered that it is--so long as the script isn't
+backgrounded. When backgrounded, however, the default behavior is not to
+print until the process finishes. This is due to Python's output
+buffering.</p>
+<p>Thankfully, the solution to this problem is simple. To enable
+unbuffered, realtime output, run python with the -u flag:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> python <span class="at">-u</span> myscript.py</span></code></pre></div>
+<p>With that, everything works as expected.</p>
+    </section>
+
+    <!--<div class="adjacent">
+      <a href="/posts/linux-top-processes-script.html" class="prev">
+	<div class="arrow">
+	  <i class="fas fa-chevron-left"></i>
+	</div>
+	<div class="sample">
+	  <h2>Linux Top Processes Script</h2>
+	  <p>I wrote a script to print the processes using the most resources,
+because a statusbar showing total resource usage alone isn&#39;t actually
+very useful.</p>
+	  <date>04 Jan 2015</date>
+	</div>
+      </a>
+      <a href="/posts/custom-workspace-info-with-i3-sockets-and-python.html" class="next">
+	<div class="sample">
+	  <h2>Custom Workspace Info with i3, Sockets, and Python</h2>
+	  <p>i3 is an extremely flexible window manager, and its Inter-Process
+Communication facility makes it extensible as well. Here I&#39;ll show how
+to harness that extensibility with Python.
+custom-workspace-info-with-i3-sockets-and-python.</p>
+	  <date>29 Jan 2015</date>
+	</div>
+	<div class="arrow">
+	  <i class="fas fa-chevron-right"></i>
+	</div>
+      </a>
+    </div>
+        <br>
+        <br>
+	-->
+
+</div>
+
+<footer>
+  <p>
+    Matthew Fitzsimmons © 2020<br>
+    Built with Haskell using&nbsp;<a href="https://github.com/ChrisPenner/slick">Slick</a>&nbsp;•&nbsp;Published with&nbsp;<a href="https://www.nixos.org">Nix</a>
+    <p>
+</footer>
+
+<script src="/js/main.js"></script>
+</body>
+</html>

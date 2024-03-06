@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head profile="http://www.w3.org/2005/10/profile">
+      <meta charset="UTF-8">
+      <meta name="description" content="">
+      <meta name="author" content="">
+      <meta name=viewport content="width=device-width, initial-scale=1">
+        <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="Flexible workspace names in i3">
+      <meta name="twitter:description" content="">
+          <title>Flexible workspace names in i3</title>
+      <link rel="stylesheet" href="/css/tufte.css">
+      <link rel="stylesheet" href="/css/custom.css">
+      <link rel="stylesheet" href="/css/syntax-minimal.css">
+  </head>
+<body>
+    <!--<header>
+    <nav class="smallHide">
+        <a  href="/">
+            <div id="home-text"> Home </div>
+        </a>
+        <a  href="/">
+            <div id="home-text"> Blog </div>
+        </a>
+        <a  href="/about">
+            <div id="home-text"> About </div>
+        </a>
+    </nav>
+    <div id="menu" class="bigHide"><i class="fas fa-bars"></i></div>
+
+    <div class="right-sidebar">
+        <a class="ext-link smallHide" href="/atom.xml">
+	  <i class="fas fa-rss"></i>
+        </a>
+
+	<div id="theme-button" class="smallHide">
+	  <i class="fas fa-adjust"></i>
+	</div>
+    </div>
+</header>
+->
+
+<div id="page">
+    <div class="wrapper">
+        <div class="masthead">
+            <div class="tags">
+	      <span class="doctype">Article</span>
+              —
+              <a href="/tag/bash" class="tag bash">bash</a>
+
+              <a href="/tag/linux" class="tag linux">linux</a>
+
+              <a href="/tag/ricing" class="tag ricing">ricing</a>
+
+              <a href="/tag/i3" class="tag i3">i3</a>
+            </div>
+            <br>
+
+            <br>
+            <div class="metadata">
+            <span class="author">Matthew Fitzsimmons</span>
+            <span class="published">05 Jan 2015 • 2 min read</span>
+            </div>
+	    <hr>
+        </div>
+    </div>-->
+
+  
+      <section class="masthead">
+        <span class="logo2"><a class="no-tufte-underline" href="/">ftzm</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">home</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">blog</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/about">about</a></span>
+      </section>
+    <section>
+    <h1> Flexible workspace names in i3 </h1>
+    <h1 id="introduction">Introduction</h1>
+<p>In the process of configuring i3 with Lemonbar I came up with a trick
+to simplify naming workspaces in i3, and potentially other WMs with
+similar configuration patterns.</p>
+<h1 id="the-trick">The Trick</h1>
+<p>i3 natively provides the ability to name workspaces, but this is
+arguably more trouble than it's worth. All keybindings relating to
+workspaces need to reference them by the assigned name, and workspace
+names typically need to be prefixed with a number to ensure they're
+ordered properly anyways (should a strict order be desired).</p>
+<p>If, however, one is using a custom bar script, workspace names can be
+assigned there rather than by i3. You can simply use numbers within i3's
+configuration script, but later convert them to names using something
+like the following:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">names</span><span class="op">=</span><span class="va">(</span>main web dev term mus<span class="va">)</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">[</span> $<span class="pp">[</span><span class="ss">num</span><span class="pp">-</span><span class="ss">1</span><span class="pp">]</span> <span class="ot">-lt</span> <span class="va">${</span><span class="op">#</span><span class="va">names</span><span class="op">[@]</span><span class="va">}</span> <span class="bu">]</span> <span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="va">name</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${names</span><span class="op">[</span>num-1<span class="op">]</span><span class="va">}</span><span class="st">&quot;</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    <span class="va">name</span><span class="op">=</span><span class="st">&quot;</span><span class="va">${num}</span><span class="st">&quot;</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span></code></pre></div>
+<p>This method allows workspaces to maintain a strict order without
+number prefixes, and keybindings and other configuration need only
+reference workspaces by number, keeping configs simple. Workspace names
+can then be changed on the fly without overhauling any configs, which
+will save a bit of time for chronic re-themers.</p>
+    </section>
+
+    <!--<div class="adjacent">
+      <a href="/posts/build-your-own-ide-with-vim-tmux-and-vimux.html" class="prev">
+	<div class="arrow">
+	  <i class="fas fa-chevron-left"></i>
+	</div>
+	<div class="sample">
+	  <h2>Build Your Own IDE with Vim, Tmux, and Vimux</h2>
+	  <p>Ok, maybe not a fully fledged IDE, but running unit tests in an external
+terminal with a single vim shortcut is pretty slick.</p>
+	  <date>16 Jan 2016</date>
+	</div>
+      </a>
+      <a href="/posts/linux-top-processes-script.html" class="next">
+	<div class="sample">
+	  <h2>Linux Top Processes Script</h2>
+	  <p>I wrote a script to print the processes using the most resources,
+because a statusbar showing total resource usage alone isn&#39;t actually
+very useful.</p>
+	  <date>04 Jan 2015</date>
+	</div>
+	<div class="arrow">
+	  <i class="fas fa-chevron-right"></i>
+	</div>
+      </a>
+    </div>
+        <br>
+        <br>
+	-->
+
+</div>
+
+<footer>
+  <p>
+    Matthew Fitzsimmons © 2020<br>
+    Built with Haskell using&nbsp;<a href="https://github.com/ChrisPenner/slick">Slick</a>&nbsp;•&nbsp;Published with&nbsp;<a href="https://www.nixos.org">Nix</a>
+    <p>
+</footer>
+
+<script src="/js/main.js"></script>
+</body>
+</html>

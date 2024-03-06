@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head profile="http://www.w3.org/2005/10/profile">
+      <meta charset="UTF-8">
+      <meta name="description" content="">
+      <meta name="author" content="">
+      <meta name=viewport content="width=device-width, initial-scale=1">
+        <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="Syncing Dotfiles in Git">
+      <meta name="twitter:description" content="">
+          <title>Syncing Dotfiles in Git</title>
+      <link rel="stylesheet" href="/css/tufte.css">
+      <link rel="stylesheet" href="/css/custom.css">
+      <link rel="stylesheet" href="/css/syntax-minimal.css">
+  </head>
+<body>
+    <!--<header>
+    <nav class="smallHide">
+        <a  href="/">
+            <div id="home-text"> Home </div>
+        </a>
+        <a  href="/">
+            <div id="home-text"> Blog </div>
+        </a>
+        <a  href="/about">
+            <div id="home-text"> About </div>
+        </a>
+    </nav>
+    <div id="menu" class="bigHide"><i class="fas fa-bars"></i></div>
+
+    <div class="right-sidebar">
+        <a class="ext-link smallHide" href="/atom.xml">
+	  <i class="fas fa-rss"></i>
+        </a>
+
+	<div id="theme-button" class="smallHide">
+	  <i class="fas fa-adjust"></i>
+	</div>
+    </div>
+</header>
+->
+
+<div id="page">
+    <div class="wrapper">
+        <div class="masthead">
+            <div class="tags">
+	      <span class="doctype">Article</span>
+              —
+              <a href="/tag/ricing" class="tag ricing">ricing</a>
+
+              <a href="/tag/git" class="tag git">git</a>
+            </div>
+            <br>
+
+            <br>
+            <div class="metadata">
+            <span class="author">Matthew Fitzsimmons</span>
+            <span class="published">23 Jan 2015 • 3 min read</span>
+            </div>
+	    <hr>
+        </div>
+    </div>-->
+
+  
+      <section class="masthead">
+        <span class="logo2"><a class="no-tufte-underline" href="/">ftzm</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">home</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">blog</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/about">about</a></span>
+      </section>
+    <section>
+    <h1> Syncing Dotfiles in Git </h1>
+    <p>One of the greatest joys of working in a Unix environment is the
+ability to tailor application settings exactly to your liking. However,
+it can equally be a pain to work on a machine without any of the
+keybinds and plugins you've become so accustomed to. Syncing your
+dotfiles across machines using <a href="https://github.com/">git</a> is
+an easy way to ensure maximum productivity wherever you work.</p>
+<h2 id="setup">Setup</h2>
+<p>To create an online repository based on the setting of one machine,
+first set up a git repository in home directory of that machine:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> cd</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git init</span></code></pre></div>
+<p>In order to make git ignore everything that <em>isn't</em> a dotfile,
+we make use of the .gitignore file. By adding a single wildcard
+(asterisk) to that file, git will be default ignore all files:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> echo <span class="st">&quot;*&quot;</span> <span class="op">&gt;&gt;</span> ~/.gitignore</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git add .gitignore</span></code></pre></div>
+<p>then, we force add all of the files we want to sync:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git add <span class="at">-f</span> .vimrc</span></code></pre></div>
+<p>To add whole folders, I find it easiest to cd into them and run:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git add <span class="at">-f</span> .</span></code></pre></div>
+<p>When you've added all the files you wish, add the remote repo and
+push your files:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git remote add origin https://github.com/youruser/dotfiles.git</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git push origin master</span></code></pre></div>
+<h2 id="sync-a-system-with-git-for-the-first-time">Sync a System with
+Git for the First Time:</h2>
+<p>git clone won't work as git needs to clone into an empty directory,
+which the home directory will invariably not be.</p>
+<p>Instead, initialize a git repo in the home directory:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> cd</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git init</span></code></pre></div>
+<p>Then, remote add the origin repository (on github in this case)</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git remote add origin https://github.com/youruser/dotfiles.git</span></code></pre></div>
+<p>Fetch the files from the origin repository</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git fetch <span class="at">--all</span></span></code></pre></div>
+<p>Then, reset the current branch to what has just been fetched. 'Git
+reset' resets the master branch to what's been fetched. The --hard
+option changes all the files in the working tree to match the files in
+origin/master."</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git reset <span class="at">--hard</span> origin/master</span></code></pre></div>
+<p>This method is preferable to a git pull, as a pull will not overwrite
+untracked local files, in the event that any local dotfiles will be
+overwritten by syncing with git.</p>
+<h2 id="add-new-changes">Add New Changes</h2>
+<p>To add new changes you've made on any machine, the procedure is the
+same as with a normal git project, but with the -f flag as above:</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git add <span class="at">-f</span> .Xresources</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> git commit <span class="at">-m</span> <span class="st">&#39;updated colorscheme&#39;</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="kw">(</span><span class="ex">first</span> time<span class="kw">)</span> <span class="ex">$</span> git push origin master</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="kw">(</span><span class="ex">thereafter</span><span class="kw">)</span> <span class="ex">$</span> git push</span></code></pre></div>
+<h2 id="keeping-up-to-date">Keeping up to Date</h2>
+<p>In order to keep up to date, a simple git pull will suffice. You may
+consider put this into a login script or cron job to keep things current
+automatically.</p>
+    </section>
+
+    <!--<div class="adjacent">
+      <a href="/posts/fixing-a-botched-system-update-with-chroot.html" class="prev">
+	<div class="arrow">
+	  <i class="fas fa-chevron-left"></i>
+	</div>
+	<div class="sample">
+	  <h2>Fixing a Botched System Update Without Chroot</h2>
+	  <p>When you find yourself unable to login to a Linux installation to fix it
+from within, chroot is usually the answer—but not always. Here I show
+how to repair a broken Arch Linux system upgrade without chroot.</p>
+	  <date>25 Jan 2015</date>
+	</div>
+      </a>
+      <a href="/posts/syntax-highlighting-with-markdown-in-python.html" class="next">
+	<div class="sample">
+	  <h2>Syntax Highlighting with Markdow in Python</h2>
+	  <p>Syntax highlighting is just as useful in a blog as in an IDE. Your code
+will be easier for readers to follow, and it will look more polished to
+boot. It&#39;s a simple feature, adding very little code.</p>
+	  <date>23 Jan 2015</date>
+	</div>
+	<div class="arrow">
+	  <i class="fas fa-chevron-right"></i>
+	</div>
+      </a>
+    </div>
+        <br>
+        <br>
+	-->
+
+</div>
+
+<footer>
+  <p>
+    Matthew Fitzsimmons © 2020<br>
+    Built with Haskell using&nbsp;<a href="https://github.com/ChrisPenner/slick">Slick</a>&nbsp;•&nbsp;Published with&nbsp;<a href="https://www.nixos.org">Nix</a>
+    <p>
+</footer>
+
+<script src="/js/main.js"></script>
+</body>
+</html>

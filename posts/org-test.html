@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head profile="http://www.w3.org/2005/10/profile">
+      <meta charset="UTF-8">
+      <meta name="description" content="">
+      <meta name="author" content="">
+      <meta name=viewport content="width=device-width, initial-scale=1">
+        <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="Org mode and hakyll">
+      <meta name="twitter:description" content="">
+          <title>Org mode and hakyll</title>
+      <link rel="stylesheet" href="/css/tufte.css">
+      <link rel="stylesheet" href="/css/custom.css">
+      <link rel="stylesheet" href="/css/syntax-minimal.css">
+  </head>
+<body>
+    <!--<header>
+    <nav class="smallHide">
+        <a  href="/">
+            <div id="home-text"> Home </div>
+        </a>
+        <a  href="/">
+            <div id="home-text"> Blog </div>
+        </a>
+        <a  href="/about">
+            <div id="home-text"> About </div>
+        </a>
+    </nav>
+    <div id="menu" class="bigHide"><i class="fas fa-bars"></i></div>
+
+    <div class="right-sidebar">
+        <a class="ext-link smallHide" href="/atom.xml">
+	  <i class="fas fa-rss"></i>
+        </a>
+
+	<div id="theme-button" class="smallHide">
+	  <i class="fas fa-adjust"></i>
+	</div>
+    </div>
+</header>
+->
+
+<div id="page">
+    <div class="wrapper">
+        <div class="masthead">
+            <div class="tags">
+	      <span class="doctype">Article</span>
+              —
+              <a href="/tag/hakyll" class="tag hakyll">hakyll</a>
+
+              <a href="/tag/org" class="tag org">org</a>
+
+              <a href="/tag/emacs" class="tag emacs">emacs</a>
+            </div>
+            <br>
+
+            <br>
+            <div class="metadata">
+            <span class="author">Matthew Fitzsimmons</span>
+            <span class="published">01 Jan 2018 • 3 min read</span>
+            </div>
+	    <hr>
+        </div>
+    </div>-->
+
+  
+      <section class="masthead">
+        <span class="logo2"><a class="no-tufte-underline" href="/">ftzm</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">home</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">blog</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/about">about</a></span>
+      </section>
+    <section>
+    <h1> Org mode and hakyll </h1>
+    <section id="introduction" class="level2">
+<h2>Introduction</h2>
+<p>Since adopting Emacs I've begun using <a
+href="https://orgmode.org/">org mode</a> extensively for note-taking and
+personal organization. It's a natural choice for outlining an article or
+blog post, and what's more, <a
+href="https://jaspervdj.be/hakyll/">Hakyll</a> (using <a
+href="https://jaspervdj.be/hakyll/">Pandoc</a>) will compile org files
+just as readily as it will markdown–no configuration required.</p>
+</section>
+<section id="features" class="level2">
+<h2>Features</h2>
+<p>Org markup is too rich to be completely converted to html, but a
+respectable subset is. Simple things like <strong>bold</strong>,
+<u>underline</u> and <em>italic</em> are of course supported. Here are
+some other examples:</p>
+<section id="subheadings" class="level3">
+<h3>Subheadings</h3>
+<p>Pandoc will support up to sub-sub-headings, but no more.</p>
+<section id="subsubheading-one" class="level4">
+<h4>Subsubheading one</h4>
+<p>He doesn't have much to say.</p>
+</section>
+<section id="subsubheading-two" class="level4">
+<h4>Subsubheading two</h4>
+</section>
+</section>
+<section id="lists" class="level3">
+<h3>Lists</h3>
+<p>This is an unordered list:</p>
+<ul>
+<li>this is a list</li>
+<li>another element</li>
+<li>another element</li>
+</ul>
+<p>Ordered lists are also handled properly:</p>
+<ol>
+<li>First</li>
+<li>Second</li>
+<li>Third</li>
+</ol>
+<p>It also supports this format with items and inset information
+underneath:</p>
+<dl>
+<dt>Some Item</dt>
+<dd>
+Information abouth this item is expanded upon.
+</dd>
+<dt>Other Item</dt>
+<dd>
+Here is some other information relating to the second item.
+</dd>
+</dl>
+</section>
+<section id="source" class="level3">
+<h3>Source</h3>
+<p>Wouldn't it be interesting to see some source? You can do inline code
+<code class="verbatim">echo "like this"</code>, and also separate code
+blocks:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ot">factorial ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>factorial <span class="dv">0</span> <span class="ot">=</span> <span class="dv">1</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>factorial n <span class="ot">=</span> n <span class="op">*</span> factorial (n <span class="op">-</span> <span class="dv">1</span>)</span></code></pre></div>
+<p>Org mode is smart enough to correctly highlight the code-block in
+org-mode itself, so you don't publish embarassing typos. Just one more
+thing to be impressed by.</p>
+</section>
+<section id="quote" class="level3">
+<h3>Quote</h3>
+<p>This is a quote:</p>
+<blockquote>
+<p>Everything should be made as simple as possible, but not any simpler
+—Albert Einstein</p>
+</blockquote>
+</section>
+<section id="table" class="level3">
+<h3>Table</h3>
+<p>My CSS may not do this justice, but this a proper table.</p>
+<table>
+<thead>
+<tr class="header">
+<th>A</th>
+<th>B</th>
+<th>Long C Column</th>
+<th>D</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>2</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td>20</td>
+<td>30</td>
+<td>40</td>
+</tr>
+</tbody>
+</table>
+<p>I remember back in the day when you would create your whole page
+layout with these bad boys. Then these upstarts named "divs" came
+along…</p>
+</section>
+</section>
+<section id="in-sum" class="level2">
+<h2>In sum</h2>
+<p>Org mode is no more convenient to write than markdown; it's edge is
+that it allows you to write a rough sketch and then slowly flesh it out
+into a finished article. Anything that lowers the barrier to producing
+finished articles is valueable in my estimation.</p>
+</section>
+    </section>
+
+    <!--<div class="adjacent">
+      <a href="/posts/tricks-with-tags-in-hakyll.html" class="prev">
+	<div class="arrow">
+	  <i class="fas fa-chevron-left"></i>
+	</div>
+	<div class="sample">
+	  <h2>Related Posts in Hakyll</h2>
+	  <p>The Hakyll framework provides tags out of the box, but no way to leverage them to automatically link to related posts. This post describes how to leverage the existing tags functionality to that end.</p>
+	  <date>25 Jan 2018</date>
+	</div>
+      </a>
+      <a href="/posts/build-your-own-ide-with-vim-tmux-and-vimux.html" class="next">
+	<div class="sample">
+	  <h2>Build Your Own IDE with Vim, Tmux, and Vimux</h2>
+	  <p>Ok, maybe not a fully fledged IDE, but running unit tests in an external
+terminal with a single vim shortcut is pretty slick.</p>
+	  <date>16 Jan 2016</date>
+	</div>
+	<div class="arrow">
+	  <i class="fas fa-chevron-right"></i>
+	</div>
+      </a>
+    </div>
+        <br>
+        <br>
+	-->
+
+</div>
+
+<footer>
+  <p>
+    Matthew Fitzsimmons © 2020<br>
+    Built with Haskell using&nbsp;<a href="https://github.com/ChrisPenner/slick">Slick</a>&nbsp;•&nbsp;Published with&nbsp;<a href="https://www.nixos.org">Nix</a>
+    <p>
+</footer>
+
+<script src="/js/main.js"></script>
+</body>
+</html>

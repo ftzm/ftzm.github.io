@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head profile="http://www.w3.org/2005/10/profile">
+      <meta charset="UTF-8">
+      <meta name="description" content="">
+      <meta name="author" content="">
+      <meta name=viewport content="width=device-width, initial-scale=1">
+        <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="Syntax Highlighting with Markdow in Python">
+      <meta name="twitter:description" content="">
+          <title>Syntax Highlighting with Markdow in Python</title>
+      <link rel="stylesheet" href="/css/tufte.css">
+      <link rel="stylesheet" href="/css/custom.css">
+      <link rel="stylesheet" href="/css/syntax-minimal.css">
+  </head>
+<body>
+    <!--<header>
+    <nav class="smallHide">
+        <a  href="/">
+            <div id="home-text"> Home </div>
+        </a>
+        <a  href="/">
+            <div id="home-text"> Blog </div>
+        </a>
+        <a  href="/about">
+            <div id="home-text"> About </div>
+        </a>
+    </nav>
+    <div id="menu" class="bigHide"><i class="fas fa-bars"></i></div>
+
+    <div class="right-sidebar">
+        <a class="ext-link smallHide" href="/atom.xml">
+	  <i class="fas fa-rss"></i>
+        </a>
+
+	<div id="theme-button" class="smallHide">
+	  <i class="fas fa-adjust"></i>
+	</div>
+    </div>
+</header>
+->
+
+<div id="page">
+    <div class="wrapper">
+        <div class="masthead">
+            <div class="tags">
+	      <span class="doctype">Article</span>
+              —
+              <a href="/tag/python" class="tag python">python</a>
+
+              <a href="/tag/flask" class="tag flask">flask</a>
+            </div>
+            <br>
+
+            <br>
+            <div class="metadata">
+            <span class="author">Matthew Fitzsimmons</span>
+            <span class="published">23 Jan 2015 • 3 min read</span>
+            </div>
+	    <hr>
+        </div>
+    </div>-->
+
+  
+      <section class="masthead">
+        <span class="logo2"><a class="no-tufte-underline" href="/">ftzm</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">home</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/">blog</a></span>
+        <span class="link"><a class="no-tufte-underline" href="/about">about</a></span>
+      </section>
+    <section>
+    <h1> Syntax Highlighting with Markdow in Python </h1>
+    <p>It seems that most of today's coding blogs have some form of syntax
+highlighting built in. I wanted to join in on this trend while making
+this blog, but found surprisingly few explanations of how to implement
+it. It tuns out it's a simple feature, adding very little code. Below I
+will show how to implement it in a python application.</p>
+<h2 id="markdown">Markdown</h2>
+<p>Markdown is now a well established markup language that greatly
+simplifies the process of writing for the web. The minimalistic markdown
+syntax is converted to html that can be inserted into a web page.
+Additionally, some implementations of Markdown are extended to allow
+Syntax highlighting. All that is required is to designate lengths of
+code, and different terms will automatically be wrapped in html tags to
+which colorizing css is later applied.</p>
+<h2 id="necessary-packages">Necessary Packages</h2>
+<p>There are multiple python packages for Markdown, but I found <a
+href="https://github.com/trentm/python-markdown2">markdown2</a> to be
+the most straightforward when it came to implementing syntax
+highlighting. For syntax highlighting, you will also need pygments. You
+should be using pip to install packages.</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">$</span> pip install markdown2 pygments</span></code></pre></div>
+<h2 id="designating-code">Designating code</h2>
+<p>In markdown2, syntax highlighting is done via an 'extra' called
+'fenced-code-blocks'. With this, all this is required is to insert three
+backticks on the lines preceding and following a stretch of code. To
+ensure the right programming language is selected for highlighting,
+append its name to the first set of backticks.</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="in">    ``` python</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="in">    class SomeCode():</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="in">        pass</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="in">    ```</span></span></code></pre></div>
+<h2 id="converting-markdown">Converting Markdown</h2>
+<p>At some point, markdown formatted text will have to be converted into
+html. All that is required for this is the following code, where
+"markdown_version" refers to the string of markdown text you wish to
+convert.</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> markdown2</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>...</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>html_version <span class="op">=</span> markdown2.markdown(markdown_version, extras<span class="op">=</span>[<span class="st">&quot;fenced-code-blocks&quot;</span>])</span></code></pre></div>
+<p>It is necessary to specify "fenced-code-blocks" as an extra so that
+markdown2 uses it to apply syntax highlighting tags. Otherwise those
+backtick-fenced stretches of code will be ignored by markdown. If
+everything works as it should, html_version should contain a string like
+the following:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode html"><code class="sourceCode html"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&lt;div</span> <span class="er">class</span><span class="ot">=</span><span class="st">&quot;codehilite&quot;</span><span class="kw">&gt;&lt;pre&gt;&lt;code&gt;&lt;span</span> <span class="er">class</span><span class="ot">=</span><span class="st">&quot;k&quot;</span><span class="kw">&gt;</span>class<span class="kw">&lt;/span&gt;</span> <span class="kw">&lt;span</span> <span class="er">class</span><span class="ot">=</span><span class="st">&quot;nc&quot;</span><span class="kw">&gt;</span>SomeCode<span class="kw">&lt;/span&gt;&lt;span</span> <span class="er">class</span><span class="ot">=</span><span class="st">&quot;p&quot;</span><span class="kw">&gt;</span>():<span class="kw">&lt;/span&gt;</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">&lt;span</span> <span class="er">class</span><span class="ot">=</span><span class="st">&quot;k&quot;</span><span class="kw">&gt;</span>pass<span class="kw">&lt;/span&gt;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="kw">&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;</span></span></code></pre></div>
+<p>As you can see, different syntactic categories are tagged. However,
+accompanying css is necessary to apply color.</p>
+<h2 id="the-css">The CSS</h2>
+<p>Applying css is as simple as downloading a colorscheme and applying
+it as you would any other css stylesheet. Colorschemes for pygments can
+be downloaded <a
+href="https://github.com/richleland/pygments-css">here</a>. Pick one
+that suits your taste, and plug it into your base.html, or wherever your
+<head> lives:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode html"><code class="sourceCode html"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&lt;link</span> <span class="er">rel</span><span class="ot">=</span><span class="st">&quot;stylesheet&quot;</span> <span class="er">type</span><span class="ot">=</span><span class="st">&quot;text/css&quot;</span> <span class="er">href</span><span class="ot">=</span><span class="st">&quot;url/for/your/colorscheme.css&quot;</span> <span class="kw">/&gt;</span></span></code></pre></div>
+    </section>
+
+    <!--<div class="adjacent">
+      <a href="/posts/syncing-dotfiles-with-git.html" class="prev">
+	<div class="arrow">
+	  <i class="fas fa-chevron-left"></i>
+	</div>
+	<div class="sample">
+	  <h2>Syncing Dotfiles in Git</h2>
+	  <p>Don&#39;t waste time fighting muscle memory. With a few easy git commands
+you can replicate your standard working environment wherever you go.</p>
+	  <date>23 Jan 2015</date>
+	</div>
+      </a>
+    </div>
+        <br>
+        <br>
+	-->
+
+</div>
+
+<footer>
+  <p>
+    Matthew Fitzsimmons © 2020<br>
+    Built with Haskell using&nbsp;<a href="https://github.com/ChrisPenner/slick">Slick</a>&nbsp;•&nbsp;Published with&nbsp;<a href="https://www.nixos.org">Nix</a>
+    <p>
+</footer>
+
+<script src="/js/main.js"></script>
+</body>
+</html>
